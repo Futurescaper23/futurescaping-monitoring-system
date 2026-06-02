@@ -1,0 +1,14 @@
+﻿{
+    "projectId":  "padstow-estuary",
+    "surveyId":  "2025-06-18",
+    "areaId":  "area5",
+    "expectedFiles":  [
+                          "ortho.jpg",
+                          "dsm.png",
+                          "contour.png",
+                          "section_lines.png",
+                          "section_profiles.csv"
+                      ],
+    "status":  "pending-upload",
+    "notes":  "Add processed outputs for this survey round and area here."
+}

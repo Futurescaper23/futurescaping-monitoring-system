@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>FutureScaping Estuary Monitoring System</title>
+    <meta name="description" content="Live estuary survey dashboard for aerial imagery, section profiles, tide context, survey notes, and sandbar change monitoring.">
+    <link rel="canonical" href="https://future-monitoring-system.onrender.com/">
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="FutureScaping">
+    <meta property="og:url" content="https://future-monitoring-system.onrender.com/">
+    <meta property="og:title" content="FutureScaping Estuary Monitoring">
+    <meta property="og:description" content="Live survey dashboard for estuary imagery, section profiles, tide context, and sandbar change monitoring.">
+    <meta property="og:image" content="https://future-monitoring-system.onrender.com/social-preview.png?v=20260510">
+    <meta property="og:image:secure_url" content="https://future-monitoring-system.onrender.com/social-preview.png?v=20260510">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="FutureScaping Estuary Monitoring">
+    <meta name="twitter:description" content="Live survey dashboard for estuary imagery, section profiles, tide context, and sandbar change monitoring.">
+    <meta name="twitter:image" content="https://future-monitoring-system.onrender.com/social-preview.png?v=20260510">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./styles.css?v=20260531a">
+  </head>
+  <body>
+    <main class="shell">
+      <div class="shell-topbar">
+        <section class="hero panel">
+          <div class="shell-brand">
+            <div class="shell-brand__mark" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <div class="shell-brand__wordmark">
+              <p class="shell-brand__name">FutureScaping</p>
+              <p class="shell-brand__sub">Labs</p>
+            </div>
+          </div>
+          <div class="shell-project-meta">
+            <p class="shell-project-kicker">Active Project</p>
+            <h1 id="projectTitle">Loading project</h1>
+            <p id="projectSummary" class="muted"></p>
+          </div>
+        </section>
+
+        <section class="tabs" id="tabs">
+          <button class="tab active" data-tab="overview" aria-label="Overview" title="Overview">
+            <span class="tab__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M4 11.5 12 5l8 6.5V20H4z"/><path d="M9 20v-5h6v5"/></svg>
+            </span>
+            <span class="tab__label">Overview</span>
+          </button>
+          <button class="tab" data-tab="areas" aria-label="Survey Areas" title="Survey Areas">
+            <span class="tab__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M4 6h16v12H4z"/><path d="M12 6v12"/><path d="M4 12h16"/></svg>
+            </span>
+            <span class="tab__label">Survey Areas</span>
+          </button>
+          <button class="tab" data-tab="weather" aria-label="Environmental Conditions" title="Environmental Conditions">
+            <span class="tab__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M7 18h10a4 4 0 1 0-.9-7.9A5.5 5.5 0 0 0 5 12.5"/></svg>
+            </span>
+            <span class="tab__label">Weather</span>
+          </button>
+          <button class="tab" data-tab="volume" aria-label="Sandbar Volume Change" title="Sandbar Volume Change">
+            <span class="tab__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M5 18V9"/><path d="M12 18V5"/><path d="M19 18v-7"/></svg>
+            </span>
+            <span class="tab__label">Volume Change</span>
+          </button>
+          <button class="tab" data-tab="layers" aria-label="Aerial View" title="Aerial View">
+            <span class="tab__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M9 6H5v12h4"/><path d="M15 6h4v12h-4"/><path d="M12 4v16"/></svg>
+            </span>
+            <span class="tab__label">Compare</span>
+          </button>
+          <button class="tab" data-tab="sections" aria-label="Sections" title="Sections">
+            <span class="tab__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M6 4v16"/><path d="M12 4v16"/><path d="M18 4v16"/></svg>
+            </span>
+            <span class="tab__label">Sections</span>
+          </button>
+          <button class="tab hidden" data-tab="admin" data-admin-only="true" aria-label="Admin">
+            <span class="tab__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5Z"/><path d="M12 3v2.5"/><path d="M12 18.5V21"/><path d="m4.9 4.9 1.8 1.8"/><path d="m17.3 17.3 1.8 1.8"/><path d="M3 12h2.5"/><path d="M18.5 12H21"/><path d="m4.9 19.1 1.8-1.8"/><path d="m17.3 6.7 1.8-1.8"/></svg>
+            </span>
+            <span class="tab__label">Admin</span>
+          </button>
+        </section>
+      </div>
+
+      <button id="backToTopBtn" class="back-to-top hidden" type="button" aria-label="Back to top">↑ Top</button>
+
+      <section class="shell-stagebar panel">
+        <div class="shell-stagebar__copy">
+          <div class="shell-stagebar__brand">
+            <div class="shell-brand__mark" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <div class="shell-stagebar__brandword">
+              <p class="shell-stagebar__brandname">FutureScaping Labs</p>
+            </div>
+          </div>
+          <p id="shellStageEyebrow" class="eyebrow">Monitoring View</p>
+          <div class="shell-stagebar__titlegroup">
+            <h2 id="shellStageTitle">Loading view</h2>
+            <p id="shellStageSummary" class="muted"></p>
+          </div>
+        </div>
+        <div id="shellStageVisual" class="shell-stagebar__visual" aria-hidden="true">
+          <img id="shellStageVisualImage" class="shell-stagebar__image" src="./assets/overview-hero-estuary.png" alt="Project overview image">
+          <div class="shell-stagebar__visual-glow" aria-hidden="true"></div>
+        </div>
+        <div id="shellStageSummaryDock" class="shell-stagebar__summary-dock hidden" aria-hidden="true"></div>
+        <div class="shell-stagebar__meta">
+          <article id="shellStageSurvey" class="shell-stage-pill"></article>
+          <article id="shellStageArea" class="shell-stage-pill"></article>
+        </div>
+      </section>
+
+      <section class="panel toolbar shell-toolbar">
+        <label class="shell-toolbar__field">Survey Round<select id="surveySelect"></select></label>
+        <label class="shell-toolbar__field shell-toolbar__field--area">Survey Area<select id="areaSelect"></select></label>
+      </section>
+
+      <section class="tab-panel active" data-panel="overview">
+        <article class="panel overview-hero">
+          <div class="overview-hero__copy">
+            <p class="eyebrow">Programme Overview</p>
+            <h2 id="overviewHeroTitle">Monitoring Overview</h2>
+            <p id="overviewHeroText" class="muted"></p>
+            <div class="overview-tab-row section-gap">
+              <button id="overviewInfoBtn" class="chip active" type="button">Information</button>
+              <button id="overviewSurveyBtn" class="chip" type="button">Survey Notes</button>
+              <button id="overviewHelpBtn" class="chip" type="button">Help</button>
+              <div class="overview-index-wrap">
+                <button id="overviewIndexBtn" class="chip" type="button" aria-expanded="false" aria-controls="overviewIndexMenu">Index</button>
+                <div id="overviewIndexMenu" class="overview-index-menu hidden" aria-hidden="true">
+                  <div class="overview-index-menu__head">
+                    <h3 id="overviewContentsTitle">Contents</h3>
+                    <p id="overviewContentsLead" class="subtext muted">Jump to any section in this page.</p>
+                  </div>
+                  <div id="overviewContentsGrid" class="overview-index-list"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="metricGrid" class="stats-grid overview-hero__stats"></div>
+        </article>
+
+        <div class="section-gap overview-support">
+          <article class="panel overview-support__primary">
+            <div class="panel-head">
+              <div>
+                <h3 id="overviewStoryTitle">Programme Context</h3>
+                <p id="overviewContentsSubtext" class="subtext muted"></p>
+              </div>
+            </div>
+            <div id="overviewStory" class="overview-story section-gap"></div>
+          </article>
+          <div id="overviewGlanceGrid" class="overview-glance-grid hidden" aria-hidden="true"></div>
+        </div>
+
+        <div class="two-col section-gap overview-lower">
+          <article class="panel overview-lower__panel overview-lower__panel--insights">
+            <p class="eyebrow">What This Shows</p>
+            <h2>Why It Matters</h2>
+            <div id="surveyReadinessGrid" class="card-grid section-gap"></div>
+            <div id="surveyReadinessDetails" class="detail-list"></div>
+          </article>
+          <article class="panel overview-lower__panel overview-lower__panel--actions">
+            <p class="eyebrow">How To Use It</p>
+            <h2>What To Do Next</h2>
+            <div id="timeline" class="timeline section-gap"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="areas">
+        <article id="areaOverviewPanel" class="panel section-gap">
+          <div class="panel-head">
+            <div>
+              <h3>Survey Areas</h3>
+              <p id="overviewAreasSubtext" class="subtext muted">Interactive area summary for the current monitoring setup.</p>
+            </div>
+          </div>
+          <div id="overviewAreaFilters" class="overview-area-filters section-gap"></div>
+          <div id="overviewAreaGrid" class="card-grid section-gap"></div>
+        </article>
+
+        <div class="two-col">
+          <article class="panel">
+            <p class="eyebrow">Area Catalogue</p>
+            <h2>Monitoring Areas</h2>
+            <div id="areaList" class="stack section-gap"></div>
+          </article>
+          <article id="selectedAreaPanel" class="panel">
+            <p class="eyebrow">Selected Area And Round Comparison</p>
+            <h2 id="selectedAreaTitle">Area</h2>
+            <p id="selectedAreaSummary" class="muted section-gap"></p>
+            <div id="selectedAreaChips" class="chips"></div>
+            <div id="selectedAreaAssets" class="card-grid section-gap"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="weather">
+        <article class="panel weather-shell">
+          <div class="weather-shell__intro">
+            <div>
+              <p class="eyebrow">Weather And Tides</p>
+              <h2>Environmental Conditions Dashboard</h2>
+              <p id="weatherSummary" class="muted">Loading weather context...</p>
+            </div>
+          </div>
+          <div class="weather-frame-wrap section-gap">
+            <iframe id="weatherFrame" class="weather-frame" title="Padstow weather and tide dashboard" loading="lazy"></iframe>
+          </div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-panel="volume">
+        <article class="panel volume-hero">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Sediment Change</p>
+              <h2>Sandbar Volume Change</h2>
+              <p id="volumeSummary" class="subtext muted"></p>
+            </div>
+          </div>
+          <div id="volumeSandboxBanner" class="notice-banner section-gap"></div>
+          <div id="volumeMetricGrid" class="stats-grid section-gap"></div>
+        </article>
+
+        <article class="panel section-gap">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Visual Context</p>
+              <h2>Where This Change Is Happening</h2>
+              <p id="volumeImageSummary" class="subtext muted"></p>
+            </div>
+          </div>
+            <div id="volumeImageryGrid" class="volume-imagery-grid section-gap">
+              <figure id="volumeBaselineCard" class="volume-image-card">
+                <div class="volume-image-card__head">
+                  <span id="volumeBaselineChip" class="chip">Baseline Aerial View</span>
+                  <strong id="volumeBaselineLabel"></strong>
+                </div>
+              <div class="volume-image-stage">
+                <img id="volumeBaselineImage" alt="">
+                <svg id="volumeBaselineOverlay" class="volume-image-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+              </div>
+              <figcaption id="volumeBaselineCaption" class="muted section-gap"></figcaption>
+            </figure>
+              <figure id="volumeCurrentCard" class="volume-image-card">
+                <div class="volume-image-card__head">
+                  <span id="volumeCurrentChip" class="chip">Current Aerial View</span>
+                  <strong id="volumeCurrentLabel"></strong>
+                </div>
+              <div class="volume-image-stage">
+                <img id="volumeCurrentImage" alt="">
+                <svg id="volumeCurrentOverlay" class="volume-image-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+              </div>
+              <figcaption id="volumeCurrentCaption" class="muted section-gap"></figcaption>
+            </figure>
+          </div>
+        </article>
+
+        <div class="two-col section-gap">
+          <article class="panel">
+            <p class="eyebrow">How It Is Calculated</p>
+            <h2>Method</h2>
+            <div id="volumeMethod" class="detail-list section-gap"></div>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">What It Means</p>
+            <h2>Client Readout</h2>
+            <div id="volumeNarrative" class="detail-list section-gap"></div>
+          </article>
+        </div>
+
+        <article class="panel section-gap">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Monitored Sandbars</p>
+              <h2>Area Breakdown</h2>
+            </div>
+          </div>
+          <div id="volumeAreaGrid" class="card-grid section-gap"></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-panel="layers">
+        <article id="layerWorkspace" class="panel layer-panel">
+          <div class="layer-heading">
+            <div>
+              <p class="eyebrow">Image Comparison</p>
+              <h2 id="viewerTitle">Comparison Viewer</h2>
+            </div>
+            <div class="chips">
+              <button id="viewerFullscreenBtn" class="chip" type="button">Fullscreen</button>
+              <button id="zoomOutBtn" class="chip" type="button">Zoom Out</button>
+              <button id="resetViewBtn" class="chip" type="button">Reset</button>
+              <button id="zoomInBtn" class="chip" type="button">Zoom In</button>
+            </div>
+          </div>
+
+          <div class="layer-toolbar section-gap">
+                <div id="layerControls" class="chips"></div>
+                <div class="viewer-compare-controls">
+                  <label>Primary Survey<select id="primaryCompareSelect"></select></label>
+                  <label>Secondary Survey<select id="secondaryCompareSelect"></select></label>
+                  <label>Primary View<select id="primaryLayerCompareSelect"></select></label>
+                  <label>Secondary View<select id="secondaryLayerCompareSelect"></select></label>
+                </div>
+                <div class="viewer-assist-controls">
+                  <label class="viewer-toggle"><input id="toggleGuideDsm" type="checkbox"><span>Show colour elevation</span></label>
+                  <label class="viewer-toggle"><input id="toggleGuideContours" type="checkbox" checked><span>Show contours</span></label>
+                  <label class="viewer-toggle"><input id="toggleChangeHighlight" type="checkbox"><span>Highlight change</span></label>
+                </div>
+                <div id="compareModeControls" class="chips">
+              <button class="chip active" type="button" data-compare-mode="single">Single View</button>
+              <button class="chip" type="button" data-compare-mode="transparency">Overlay</button>
+              <button class="chip" type="button" data-compare-mode="slider">Swipe</button>
+            </div>
+            <div id="compareHighlightLegend" class="compare-highlight-legend hidden" aria-live="polite"></div>
+          </div>
+
+          <div id="viewerStage" class="viewer-stage section-gap">
+            <div id="transparencyControls" class="transparency-panel hidden" aria-live="polite">
+              <div class="transparency-panel__header">
+                <p class="eyebrow">Transparency Mix</p>
+              </div>
+              <label>
+                Primary Image
+                <input id="primaryOpacityRange" type="range" min="0" max="100" step="1" value="100">
+              </label>
+              <label>
+                Secondary Image
+                <input id="secondaryOpacityRange" type="range" min="0" max="100" step="1" value="55">
+              </label>
+            </div>
+            <div id="viewerTransform" class="viewer-transform">
+              <img id="viewerBaseImage" alt="">
+              <div id="viewerGuideDsmOverlay" class="viewer-overlay hidden viewer-overlay--guide">
+                <img id="viewerGuideDsmImage" alt="">
+              </div>
+              <div id="viewerGuideContourOverlay" class="viewer-overlay hidden viewer-overlay--guide">
+                <img id="viewerGuideContourImage" alt="">
+              </div>
+              <div id="viewerTransparencyOverlay" class="viewer-overlay hidden">
+                <img id="viewerOverlayImage" alt="">
+              </div>
+              <div id="viewerHighlightOverlay" class="viewer-overlay hidden viewer-overlay--highlight">
+                <img id="viewerHighlightImage" alt="">
+              </div>
+              <div id="viewerSliderOverlay" class="viewer-overlay hidden">
+                <img id="viewerSliderImage" alt="">
+              </div>
+            </div>
+            <div id="sliderHandle" class="slider-handle hidden" aria-hidden="true"></div>
+          </div>
+
+          <p id="viewerCaption" class="muted section-gap"></p>
+
+          <div class="layer-support section-gap">
+            <div id="compareInsightGrid" class="card-grid"></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-panel="sections">
+        <article id="sectionWorkspace" class="panel section-workspace">
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">Cross Sections</p>
+              <h2 id="sectionPanelTitle">Section Profile</h2>
+              <p id="sectionStatusText" class="muted section-gap"></p>
+            </div>
+            <div class="section-toolbar">
+              <label class="section-select-label">Section<select id="sectionSelect"></select></label>
+              <div class="chips">
+                <button id="sectionOrthoBtn" class="chip active" type="button">Aerial View</button>
+                <button id="sectionDsmBtn" class="chip" type="button">Colour Elevation</button>
+              </div>
+              <button id="sectionFullscreenBtn" class="chip" type="button">Fullscreen</button>
+            </div>
+          </div>
+
+            <div class="section-map-panel section-gap">
+              <div id="sectionMapStage" class="section-map-stage">
+                <img id="sectionBaseImage" class="section-map-image" alt="">
+                <img id="sectionOverlayImage" class="section-map-image section-map-overlay" alt="">
+                <div class="section-stage-head">
+                  <article class="section-stage-hero">
+                    <p class="eyebrow">Monitoring Area</p>
+                    <h3 id="sectionHeroTitle">Section View</h3>
+                    <p id="sectionHeroSummary" class="muted"></p>
+                  </article>
+                  <article id="sectionSurveyPill" class="section-survey-pill"></article>
+                </div>
+                <div id="sectionHotspots" class="section-hotspots"></div>
+                <div id="sectionMapMarker" class="section-map-marker hidden" aria-hidden="true"></div>
+                <div id="sectionHeroStats" class="section-hero-stats"></div>
+                <div id="sectionQuickSelect" class="chips section-quick-inline"></div>
+              </div>
+            </div>
+
+            <div class="section-profile-panel section-gap">
+              <div class="chart-wrap section-chart-wrap">
+                <div id="sectionAnalysisGrid" class="section-analysis-grid">
+                  <div class="section-analysis-chart">
+                    <svg id="profileChart" viewBox="0 0 960 320" role="img" aria-label="Section profile"></svg>
+                  </div>
+                  <div id="sectionComparisonSummary" class="section-comparison-summary hidden">
+                    <article class="section-difference-card">
+                      <p class="eyebrow">Height Difference</p>
+                      <p id="sectionDifferenceSurveyLabel" class="muted">Live comparison along this section.</p>
+                      <p id="sectionDifferenceValue" class="section-difference-card__value">--</p>
+                      <p id="sectionDifferenceText" class="section-difference-card__text muted">Tick another survey round to compare the same fixed section.</p>
+                    </article>
+                    <article class="section-difference-inset">
+                      <div class="section-difference-inset__header">
+                        <p class="eyebrow">Local Zoom</p>
+                        <p id="sectionDifferenceRange" class="muted">A short window around the current cursor position.</p>
+                      </div>
+                      <svg id="sectionDifferenceInset" viewBox="0 0 380 150" role="img" aria-label="Local section comparison zoom"></svg>
+                    </article>
+                  </div>
+                </div>
+                <div class="section-profile-toolbar section-chart-toolbar">
+                  <div>
+                    <p class="eyebrow">Survey Profiles</p>
+                    <div id="sectionProfileControls" class="section-profile-controls"></div>
+                  </div>
+                  <div id="sectionProfileLegend" class="section-profile-legend"></div>
+                </div>
+              </div>
+              <div id="sectionMetrics" class="stats-grid section-metric-strip section-gap"></div>
+              <div id="sectionDetails" class="section-insight-grid section-gap"></div>
+            </div>
+        </article>
+
+        <div id="sectionInsightOverlay" class="section-insight-overlay hidden" aria-hidden="true">
+          <div id="sectionInsightOverlayBackdrop" class="section-insight-overlay__backdrop"></div>
+          <article class="section-insight-overlay__dialog" role="dialog" aria-modal="true" aria-labelledby="sectionInsightOverlayTitle">
+            <div class="section-insight-overlay__header">
+              <div>
+                <p id="sectionInsightOverlayEyebrow" class="eyebrow">Section Insight</p>
+                <h3 id="sectionInsightOverlayTitle">Insight</h3>
+              </div>
+              <button id="sectionInsightOverlayClose" class="chip" type="button" aria-label="Close section insight">Close</button>
+            </div>
+            <p id="sectionInsightOverlaySummary" class="section-insight-overlay__summary muted"></p>
+            <div id="sectionInsightOverlayBody" class="section-insight-overlay__body"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="tab-panel hidden" data-panel="admin" data-admin-only="true">
+        <div class="two-col">
+          <article class="panel">
+            <p class="eyebrow">Internal Console</p>
+            <h2>Survey Round Manager</h2>
+            <p class="muted section-gap">Create the next survey round here, then upload its area outputs once processing is ready.</p>
+            <div class="admin-grid section-gap">
+              <label>Survey name<input id="newSurveyName" type="text" placeholder="Survey Round 3"></label>
+              <label>Start date<input id="newSurveyStart" type="date"></label>
+              <label>End date<input id="newSurveyEnd" type="date"></label>
+              <label>Compare against<select id="newSurveyBaseline"></select></label>
+            </div>
+            <div class="admin-actions section-gap">
+              <button id="createSurveyBtn" class="area-action" type="button">Create Survey Round</button>
+            </div>
+            <div id="createSurveyStatus" class="detail-list section-gap"></div>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">Survey Context Editor</p>
+            <h2>Selected Survey and Area Notes</h2>
+            <p id="adminMetadataSummary" class="muted section-gap"></p>
+            <div class="admin-grid section-gap">
+              <label>Status label<input id="metaStatusLabel" type="text" placeholder="Near low tide"></label>
+              <label>Status tone
+                <select id="metaStatusTone">
+                  <option value="blue">Blue</option>
+                  <option value="green">Green</option>
+                  <option value="amber">Amber</option>
+                  <option value="rose">Rose</option>
+                </select>
+              </label>
+              <label class="admin-span-2">Area summary<textarea id="metaPurpose" placeholder="Short explanation of why this area matters in this survey round."></textarea></label>
+              <label>Flight start<input id="metaStart" type="text" placeholder="13:14"></label>
+              <label>Flight finish<input id="metaFinish" type="text" placeholder="13:56"></label>
+              <label>Area size<input id="metaSize" type="text" placeholder="0.91 km2"></label>
+              <label>Low tide time<input id="metaLowTide" type="text" placeholder="13:47"></label>
+              <label>Low tide height<input id="metaLowTideHeight" type="text" placeholder="0.53 m"></label>
+              <label>Launch offset<input id="metaLaunchOffset" type="text" placeholder="33 mins before low tide"></label>
+              <label>Estimated duration<input id="metaEstimatedDuration" type="text" placeholder="31m 21s"></label>
+              <label>Actual duration<input id="metaActualDuration" type="text" placeholder="39m 11s"></label>
+              <label>Tidal window<input id="metaTideWindow" type="text" placeholder="Approx. 1.12 m to 0.70 m"></label>
+              <label>Low-tide alignment score<input id="metaTideScore" type="text" placeholder="95"></label>
+              <label class="admin-span-2">Tags<input id="metaTags" type="text" placeholder="Day 1, Central reach, Near low tide"></label>
+              <label class="admin-span-2">Mission role<textarea id="metaMissionRole" placeholder="What role this area played in the survey round."></textarea></label>
+              <label class="admin-span-2">Operational note<textarea id="metaOperationalNote" placeholder="Access, timing, field conditions, logistics."></textarea></label>
+              <label class="admin-span-2">Weather note<textarea id="metaWeatherNotes" placeholder="Wind, cloud, exposure, anything notable on site."></textarea></label>
+              <label class="admin-span-2">Interpretation note<textarea id="metaSurveyNotes" placeholder="What this area showed and why it matters for clients."></textarea></label>
+            </div>
+            <div class="admin-actions section-gap">
+              <button id="saveAreaMetadataBtn" class="area-action" type="button">Save Survey Area Notes</button>
+              <button id="resetAreaMetadataBtn" class="chip" type="button">Reset To Baseline</button>
+            </div>
+            <div id="areaMetadataStatus" class="detail-list section-gap"></div>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">Volume Change Intake</p>
+            <h2>Selected Survey and Area Volumes</h2>
+            <p id="volumeAdminSummary" class="muted section-gap"></p>
+            <div class="admin-grid section-gap">
+              <label>Calculation method<input id="volumeMethodInput" type="text" placeholder="DSM difference raster clipped to fixed sandbar polygons"></label>
+              <label>Cell size / grid note<input id="volumeCellSizeInput" type="text" placeholder="0.05 m cell size"></label>
+              <label class="admin-span-2">Area note<textarea id="volumeNotesInput" placeholder="Plain-English summary for this area in this comparison."></textarea></label>
+              <label class="admin-span-2">Sandbar rows<textarea id="volumeRowsInput" placeholder="Outer Bar|120.5|45.2|75.3|High confidence|Build-up on seaward edge&#10;Inner Bar|60.0|18.4|41.6|Medium confidence|Small gain on upper ridge"></textarea></label>
+            </div>
+            <div class="admin-actions section-gap">
+              <button id="saveVolumeBtn" class="area-action" type="button">Save Volume Change</button>
+            </div>
+            <div id="volumeAdminStatus" class="detail-list section-gap"></div>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">Upload Console</p>
+            <h2>Survey Asset Intake</h2>
+            <p id="adminTargetSummary" class="muted section-gap"></p>
+            <div id="adminExpectedFiles" class="detail-list section-gap"></div>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">Upload Files</p>
+            <h2>Selected Survey and Area</h2>
+            <div class="admin-grid section-gap">
+              <label>Aerial View<input id="uploadOrtho" type="file" accept=".jpg,.jpeg,image/jpeg"></label>
+              <label>Colour Elevation<input id="uploadDsm" type="file" accept=".png,image/png"></label>
+              <label>Contours<input id="uploadContour" type="file" accept=".png,image/png"></label>
+              <label>Section Lines<input id="uploadSectionLines" type="file" accept=".png,image/png"></label>
+              <label>Section Profiles CSV<input id="uploadSectionCsv" type="file" accept=".csv,text/csv"></label>
+            </div>
+            <div class="admin-actions section-gap">
+              <button id="uploadSelectedFiles" class="area-action" type="button">Upload Selected Files</button>
+            </div>
+            <div id="adminUploadStatus" class="detail-list section-gap"></div>
+          </article>
+        </div>
+        <article class="panel section-gap">
+          <p class="eyebrow">Survey Board</p>
+          <h2>All Areas For This Survey</h2>
+          <div id="adminBoardSummary" class="stats-grid section-gap"></div>
+          <div id="adminBoardGrid" class="card-grid section-gap"></div>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">Reusable Pattern</p>
+          <h2>How This Scales</h2>
+          <div id="workflowGrid" class="card-grid section-gap"></div>
+        </article>
+      </section>
+
+      <footer class="shell-footer">
+        <p>&copy; 2026 FutureScaping Ltd. All rights reserved.</p>
+        <div class="shell-footer__actions">
+          <a href="https://futurescaping.co.uk/">FutureScaping</a>
+          <a href="./privacy.html">Privacy Notice</a>
+          <a href="./cookies.html">Cookie Notice</a>
+          <a href="./contact.html">Contact</a>
+          <button id="adminModeToggle" class="chip shell-footer__toggle hidden" type="button">Open Admin Console</button>
+        </div>
+      </footer>
+    </main>
+
+    <script type="module" src="./app.js?v=20260531a"></script>
+  </body>
+</html>
