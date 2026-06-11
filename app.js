@@ -424,6 +424,7 @@ const els = {
   volumeViewerTitle: byId("volumeViewerTitle"),
   volumeViewerSummary: byId("volumeViewerSummary"),
   volumeViewerFrame: byId("volumeViewerFrame"),
+  volumeViewerGuide: byId("volumeViewerGuide"),
   volumeViewerStats: byId("volumeViewerStats"),
   volumeViewerDetails: byId("volumeViewerDetails"),
   volumeImageSummary: byId("volumeImageSummary"),
@@ -2817,6 +2818,13 @@ async function renderVolume() {
   const viewerSummary = areaDataset?.viewerSummary
     || "Explore the tested area in 3D, then use the figures and supporting maps alongside it to interpret where material appears to have been gained or lost.";
   const viewerStats = areaDataset?.viewerStats || null;
+  const viewerGuideTitle = areaDataset?.viewerGuideTitle || "How to read this viewer";
+  const viewerGuideWhatIs = areaDataset?.viewerGuideWhatIs
+    || "This interactive model compares the same measured area across two survey dates using point-cloud-derived terrain data and a shared comparison footprint.";
+  const viewerGuideColours = areaDataset?.viewerGuideColours
+    || "The coloured overlay highlights where the later survey appears higher or lower than the earlier one. Read it as relative gain and loss across the compared surface, then cross-check the summary figures and flat reference maps below.";
+  const viewerGuideUse = areaDataset?.viewerGuideUse
+    || "Drag to orbit, scroll to zoom, and click points to inspect local height or change values. Use the controls on the right to simplify the display if you want a cleaner read.";
 
   const [baselineImageSrc, currentImageSrc, previewImageSrc, previewBaselineImageSrc, previewCurrentImageSrc] = await Promise.all([
     baselineSurvey ? resolveExistingAsset(surveyAssetCandidates(project.id, baselineSurvey.id, sandboxArea.id, "ortho.jpg")) : Promise.resolve(""),
@@ -2878,6 +2886,7 @@ async function renderVolume() {
       els.volumeViewerFrame.removeAttribute("src");
       els.volumeViewerTitle.textContent = "Area Change Viewer";
       els.volumeViewerSummary.textContent = "";
+      els.volumeViewerGuide.innerHTML = "";
       els.volumeViewerStats.innerHTML = "";
       els.volumeViewerDetails.innerHTML = "";
       return;
@@ -2885,6 +2894,26 @@ async function renderVolume() {
 
     els.volumeViewerTitle.textContent = viewerTitle;
     els.volumeViewerSummary.textContent = viewerSummary;
+    els.volumeViewerGuide.innerHTML = `
+      <div class="volume-viewer-guide__head">
+        <p class="eyebrow">Before you start</p>
+        <h3>${escapeHtml(viewerGuideTitle)}</h3>
+      </div>
+      <div class="volume-viewer-guide__grid">
+        <article class="volume-viewer-guide__card">
+          <strong>What this is</strong>
+          <p>${escapeHtml(viewerGuideWhatIs)}</p>
+        </article>
+        <article class="volume-viewer-guide__card">
+          <strong>What the colours show</strong>
+          <p>${escapeHtml(viewerGuideColours)}</p>
+        </article>
+        <article class="volume-viewer-guide__card">
+          <strong>How to use it</strong>
+          <p>${escapeHtml(viewerGuideUse)}</p>
+        </article>
+      </div>
+    `;
     els.volumeViewerFrame.src = viewerEmbedUrl;
     els.volumeViewerStats.innerHTML = viewerStats
       ? [
