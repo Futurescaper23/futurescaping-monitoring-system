@@ -1,4 +1,4 @@
-{
+﻿window.__FSM_PROJECTS__ = {
   "projects": [
     {
       "id": "padstow-estuary",
@@ -376,3 +376,5 @@
     }
   ]
 }
+;
+

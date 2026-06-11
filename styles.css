@@ -2950,6 +2950,40 @@ textarea {
   gap: 18px;
 }
 
+.volume-viewer-layout {
+  display: block;
+}
+
+.volume-viewer-stage,
+.volume-viewer-aside {
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(77, 112, 166, 0.22), rgba(39, 60, 96, 0.3));
+}
+
+.volume-viewer-stage {
+  min-height: 900px;
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+
+.volume-viewer-frame {
+  width: 100%;
+  height: 100%;
+  min-height: 900px;
+  display: block;
+  border: 0;
+  background: linear-gradient(180deg, #d9e2ef 0%, #c7d2e4 100%);
+}
+
+.volume-viewer-aside {
+  padding: 18px;
+}
+
+.volume-viewer-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .volume-imagery-grid--single {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -3045,6 +3079,26 @@ textarea {
   .volume-imagery-grid,
   .volume-card__grid {
     grid-template-columns: 1fr;
+  }
+
+  .volume-viewer-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .volume-viewer-stage,
+  .volume-viewer-frame {
+    min-height: 620px;
+  }
+}
+
+@media (max-width: 700px) {
+  .volume-viewer-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .volume-viewer-stage,
+  .volume-viewer-frame {
+    min-height: 480px;
   }
 }
 

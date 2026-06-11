@@ -420,6 +420,12 @@ const els = {
   volumeSummary: byId("volumeSummary"),
   volumeSandboxBanner: byId("volumeSandboxBanner"),
   volumeMetricGrid: byId("volumeMetricGrid"),
+  volumeViewerPanel: byId("volumeViewerPanel"),
+  volumeViewerTitle: byId("volumeViewerTitle"),
+  volumeViewerSummary: byId("volumeViewerSummary"),
+  volumeViewerFrame: byId("volumeViewerFrame"),
+  volumeViewerStats: byId("volumeViewerStats"),
+  volumeViewerDetails: byId("volumeViewerDetails"),
   volumeImageSummary: byId("volumeImageSummary"),
   volumeBaselineLabel: byId("volumeBaselineLabel"),
   volumeCurrentLabel: byId("volumeCurrentLabel"),
@@ -565,12 +571,7 @@ bootstrap().catch((error) => {
 });
 
 async function bootstrap() {
-  const response = await fetch(projectConfig.data.projectsPath);
-  if (!response.ok) {
-    throw new Error("Project data could not be loaded.");
-  }
-
-  state.dataset = await response.json();
+  state.dataset = await loadProjectDataset();
   const requestedAdminMode = new URLSearchParams(window.location.search).get("admin") === "1" || window.localStorage.getItem("fsm-admin-mode") === "1";
   state.adminMode = adminToolsEnabled() && requestedAdminMode;
   if (!adminToolsEnabled()) {
@@ -587,6 +588,33 @@ async function bootstrap() {
   applyUrlState();
   bindEvents();
   renderAll();
+}
+
+async function loadProjectDataset() {
+  if (window.location.protocol === "file:") {
+    const inlineData = window.__FSM_PROJECTS__;
+    if (inlineData?.projects?.length) {
+      return inlineData;
+    }
+    const embeddedJson = document.getElementById("fsmProjectDataset")?.textContent?.trim();
+    if (embeddedJson) {
+      try {
+        const parsed = JSON.parse(embeddedJson);
+        if (parsed?.projects?.length) {
+          return parsed;
+        }
+      } catch (error) {
+        throw new Error("The embedded local dataset could not be parsed.");
+      }
+    }
+    throw new Error("This local preview needs the bundled data script. Keep `data/projects.inline.js` beside the app when opening `index.html` directly.");
+  }
+
+  const response = await fetch(projectConfig.data.projectsPath);
+  if (!response.ok) {
+    throw new Error("Project data could not be loaded.");
+  }
+  return response.json();
 }
 
 function applyUrlState() {
@@ -2777,9 +2805,18 @@ async function renderVolume() {
   const previewImageFile = areaDataset?.previewImage || "";
   const previewBaselineImageFile = areaDataset?.previewBaselineImage || "";
   const previewCurrentImageFile = areaDataset?.previewCurrentImage || "";
+  const previewBaselineLabel = areaDataset?.previewBaselineLabel || "";
+  const previewCurrentLabel = areaDataset?.previewCurrentLabel || "";
+  const previewBaselineCaption = areaDataset?.previewBaselineCaption || "";
+  const previewCurrentCaption = areaDataset?.previewCurrentCaption || "";
   const previewLabel = areaDataset?.previewLabel || "Sandbar Volume Change Preview";
   const previewCaption = areaDataset?.previewCaption
     || "This first preview places the measured change map over the latest aerial image so people can see where the monitored sandbar appears to be building up or wearing away inside the measured zone.";
+  const viewerEmbedUrl = areaDataset?.viewerEmbedUrl || "";
+  const viewerTitle = areaDataset?.viewerTitle || "Area Change Viewer";
+  const viewerSummary = areaDataset?.viewerSummary
+    || "Explore the tested area in 3D, then use the figures and supporting maps alongside it to interpret where material appears to have been gained or lost.";
+  const viewerStats = areaDataset?.viewerStats || null;
 
   const [baselineImageSrc, currentImageSrc, previewImageSrc, previewBaselineImageSrc, previewCurrentImageSrc] = await Promise.all([
     baselineSurvey ? resolveExistingAsset(surveyAssetCandidates(project.id, baselineSurvey.id, sandboxArea.id, "ortho.jpg")) : Promise.resolve(""),
@@ -2835,12 +2872,44 @@ async function renderVolume() {
     els.volumeCurrentCard.classList.toggle("is-hidden", enabled);
   };
 
+  const setViewerState = (enabled) => {
+    els.volumeViewerPanel.classList.toggle("is-hidden", !enabled);
+    if (!enabled) {
+      els.volumeViewerFrame.removeAttribute("src");
+      els.volumeViewerTitle.textContent = "Area Change Viewer";
+      els.volumeViewerSummary.textContent = "";
+      els.volumeViewerStats.innerHTML = "";
+      els.volumeViewerDetails.innerHTML = "";
+      return;
+    }
+
+    els.volumeViewerTitle.textContent = viewerTitle;
+    els.volumeViewerSummary.textContent = viewerSummary;
+    els.volumeViewerFrame.src = viewerEmbedUrl;
+    els.volumeViewerStats.innerHTML = viewerStats
+      ? [
+        metric("Analysed area", viewerStats.analysedArea || "--", "Measured footprint compared in this trial"),
+        metric("Gain area", viewerStats.gainArea || "--", "Where the later survey sits higher"),
+        metric("Loss area", viewerStats.lossArea || "--", "Where the later survey sits lower"),
+        metric("Matching cells", viewerStats.matchingCells || "--", "How much of the two surfaces aligned cleanly")
+      ].join("")
+      : "";
+    els.volumeViewerDetails.innerHTML = [
+      detail("How to use it", "Drag to orbit, scroll to zoom, and pan to inspect where the change surface sits against the underlying terrain."),
+      detail("What the colours mean", "Cool colours show relative build-up, warmer colours show relative lowering, and the paired maps underneath give a flatter plan-view readout."),
+      detail("Processing note", viewerStats
+        ? `Grid size ${viewerStats.gridSize || "--"} with a reporting threshold of ${viewerStats.threshold || "--"}.`
+        : "Viewer details will appear here once the trial metadata has been entered.")
+    ].join("");
+  };
+
   els.volumeSandboxBanner.innerHTML = `
-    <strong>Sandbox Preview - Area 4 only</strong>
+    <strong>Sandbox Preview - Area 3 only</strong>
     <p>We are currently using ${escapeHtml(sandboxArea.label)} as the live testing area for sandbar volume change. This page is here to prove the workflow, imagery, and plain-English reporting before the same method is rolled out to the other monitored areas.</p>
   `;
 
   if (!baselineSurvey && !volumeDataset) {
+    setViewerState(false);
     setPreviewState(false);
     renderVolumePolygonOverlay(els.volumeBaselineOverlay, []);
     renderVolumePolygonOverlay(els.volumeCurrentOverlay, currentImageExists ? polygons : []);
@@ -2892,6 +2961,8 @@ async function renderVolume() {
     return;
   }
 
+  setViewerState(Boolean(viewerEmbedUrl));
+
   const baselineLabel = volumeDataset?.baselineSurveyId
     ? (project.surveys.find((item) => item.id === volumeDataset.baselineSurveyId)?.label || baselineSurvey?.label || "baseline survey")
     : (baselineSurvey?.label || "baseline survey");
@@ -2916,7 +2987,7 @@ async function renderVolume() {
     }
     els.volumeCurrentImage.removeAttribute("src");
     els.volumeCurrentCaption.textContent = "";
-    els.volumeSummary.textContent = `${area.label} is still in testing for sandbar volume change. Area 4 currently shows the first working preview of what this page will become as more measured results are added.`;
+    els.volumeSummary.textContent = `${area.label} is still in testing for sandbar volume change. ${area.label} currently shows the first working preview of what this page will become as more measured results are added.`;
     els.volumeImageSummary.textContent = "This area is set up for the workflow, but the finished preview map and measured sandbar figures have not been added yet.";
   } else {
   setPreviewState(useSinglePreview);
@@ -2937,18 +3008,18 @@ async function renderVolume() {
     setPreviewState(false);
     renderVolumePolygonOverlay(els.volumeBaselineOverlay, []);
     renderVolumePolygonOverlay(els.volumeCurrentOverlay, []);
-    els.volumeBaselineChip.textContent = "Earlier change context";
-    els.volumeCurrentChip.textContent = "Later change context";
-    els.volumeBaselineLabel.textContent = baselineSurvey?.shortDate || "Earlier survey";
-    els.volumeCurrentLabel.textContent = survey.shortDate;
+    els.volumeBaselineChip.textContent = previewBaselineLabel || "Earlier change context";
+    els.volumeCurrentChip.textContent = previewCurrentLabel || "Later change context";
+    els.volumeBaselineLabel.textContent = previewBaselineLabel || baselineSurvey?.shortDate || "Earlier survey";
+    els.volumeCurrentLabel.textContent = previewCurrentLabel || survey.shortDate;
     els.volumeBaselineImage.src = previewBaselineImageSrc;
     els.volumeBaselineImage.alt = `${area.label} ${baselineLabel} volume change context`;
-    els.volumeBaselineCaption.textContent = `${area.label} with the measured change overlay shown against the earlier survey context.`;
+    els.volumeBaselineCaption.textContent = previewBaselineCaption || `${area.label} with the measured change overlay shown against the earlier survey context.`;
     els.volumeCurrentImage.src = previewCurrentImageSrc;
     els.volumeCurrentImage.alt = `${area.label} ${survey.label} volume change context`;
-    els.volumeCurrentCaption.textContent = `${area.label} with the measured change overlay shown against the later survey context.`;
-    els.volumeSummary.textContent = `${area.label} is being compared between ${baselineSurvey?.shortDate || baselineLabel} and ${survey.shortDate}. Because there are only about 25 days between these surveys, this sandbox preview is showing subtle movement rather than a dramatic reshaping of the whole sandbar.`;
-    els.volumeImageSummary.textContent = "These preview maps show the same change against both survey views, so people can see where the movement sits in the earlier and later aerial images.";
+    els.volumeCurrentCaption.textContent = previewCurrentCaption || `${area.label} with the measured change overlay shown against the later survey context.`;
+    els.volumeSummary.textContent = `${area.label} is being compared between ${baselineSurvey?.shortDate || baselineLabel} and ${survey.shortDate}. This trial now pairs the measured totals with a live 3D viewer and two flat reference maps so the change is easier to interpret from different angles.`;
+    els.volumeImageSummary.textContent = "These downloaded reference maps sit alongside the 3D viewer: one shows the measured height-change surface, and the other simplifies the same result into gain-and-loss classes.";
   } else {
     renderVolumePolygonOverlay(els.volumeBaselineOverlay, baselineImageExists ? polygons : []);
     renderVolumePolygonOverlay(els.volumeCurrentOverlay, currentImageExists ? polygons : []);
@@ -3018,7 +3089,7 @@ async function renderVolume() {
       <div class="volume-explainer">
         <div class="volume-explainer__block">
           <strong>What this preview is showing</strong>
-          <p>This first preview compares two surveys taken less than a month apart, so the change is relatively modest. Over longer gaps, the same method should make sandbar movement much easier to see.</p>
+          <p>This first live trial combines the measured volume totals with a hosted 3D scene and plan-view maps, so people can move between overall numbers, interactive terrain context, and simple classification imagery.</p>
         </div>
         <div class="volume-explainer__block">
           <strong>Plain-English readout</strong>
@@ -3040,7 +3111,7 @@ async function renderVolume() {
         </div>
         <div class="volume-explainer__block">
           <strong>What to look at instead</strong>
-          <p>Area 4 currently shows the first live preview of how this page will work once the measured outputs are in place.</p>
+          <p>${escapeHtml(`${sandboxArea.label} currently shows the first live preview of how this page will work once the measured outputs are in place.`)}</p>
         </div>
         <div class="volume-explainer__block">
           <strong>Next step</strong>
