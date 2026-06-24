@@ -2673,15 +2673,125 @@ function configuredPanoramaEmbed(surveyId, areaId) {
   return projectConfig.branding?.panoramaEmbedsBySurvey?.[surveyId]?.[areaId] || "";
 }
 
+const PANORAMA_AREA_GUIDES = {
+  area1: {
+    summary: "Outer-estuary panorama focused on Hawker's Cove, Tregirls Beach, and the exposed Doom Bar edge.",
+    stats: [
+      ["Main focus", "Outer beach and bar edge", "Use this view to read how the lower estuary opens out towards the sea."],
+      ["Best for", "Early exposure checks", "Helpful for seeing how much of the outer sand and beach face was visible during capture."]
+    ],
+    details: [
+      ["What to look for", "Look across the outer bar, beach width, and the exposed edge of the lower estuary where tidal windows change quickly."],
+      ["Why it matters", "This is one of the clearest places to explain how survey timing affects visible sand extent, especially before low water."],
+      ["Client takeaway", "A wider exposed beach or bar here usually points to stronger low-tide access and a better view of outer-estuary change."]
+    ]
+  },
+  area2: {
+    summary: "Daymer Bay panorama showing the estuary entrance margin and the broad beach surface on the north side.",
+    stats: [
+      ["Main focus", "Entrance beach surface", "Best used for reading broad beach shape and shoreline position."],
+      ["Best for", "Comparing sand spread", "Helpful for seeing whether sand is sitting higher, wider, or further seaward than before."]
+    ],
+    details: [
+      ["What to look for", "Look at the width of exposed sand, the line of wet versus dry beach, and the overall shape of the entrance margin."],
+      ["Why it matters", "This area gives a strong visual read on how the entrance beach is presenting from one survey round to the next."],
+      ["Client takeaway", "If the exposed surface here appears broader or more continuous, it usually supports a build-up story rather than local erosion."]
+    ]
+  },
+  area3: {
+    summary: "Central entrance panorama around Doom Bar, useful for understanding bar shape, channel position, and change through time.",
+    stats: [
+      ["Main focus", "Doom Bar form", "Use this area to read bar shape, crest position, and nearby channel behaviour."],
+      ["Best for", "Visible movement checks", "Helpful for spotting whether sand has shifted, stretched, or narrowed between rounds."]
+    ],
+    details: [
+      ["What to look for", "Look for changes in the bar outline, the apparent high points, and how the channel edge sits against the sand body."],
+      ["Why it matters", "This is one of the most legible places for clients to see estuary movement without needing to read a graph first."],
+      ["Client takeaway", "A bar that looks fuller and more continuous over several rounds supports consistent build-up, while a broken or cut-back shape suggests redistribution or erosion."]
+    ]
+  },
+  area4: {
+    summary: "Harbour reach panorama covering the main low-tide central estuary view where exposed sandbars are easiest to compare.",
+    stats: [
+      ["Main focus", "Central estuary bars", "Use this panorama to compare the main exposed sand surfaces around low water."],
+      ["Best for", "Core repeat comparisons", "This is one of the strongest client-facing views for explaining visible change over time."]
+    ],
+    details: [
+      ["What to look for", "Look at bar width, exposed channel margins, and whether the central surfaces appear higher, flatter, or more cut through."],
+      ["Why it matters", "This area often sits in one of the cleanest low-tide windows, so the exposed landform is easier to compare round to round."],
+      ["Client takeaway", "If change is consistent here as well as in the section graphs, it gives stronger confidence that the broader central estuary is shifting rather than just one local patch."]
+    ]
+  },
+  area5: {
+    summary: "Porthilly Cove panorama focused on the quieter inner transition zone between beach edge, mudflat, and returning water.",
+    stats: [
+      ["Main focus", "Cove edge and mudflat", "Useful for reading subtle shoreline adjustments in a more sheltered part of the estuary."],
+      ["Best for", "Quieter change signals", "This view helps show smaller shape changes that are easier to miss in the more dynamic outer areas."]
+    ],
+    details: [
+      ["What to look for", "Look at the cove edge, the outline of exposed mud or sand, and how far the open surface reaches into the shelter of the cove."],
+      ["Why it matters", "Because this area is calmer, repeated change here can be a useful sign that the estuary is gradually reorganising rather than only reacting at the entrance."],
+      ["Client takeaway", "Subtle expansion or retreat in this cove can help explain whether material is settling into sheltered zones or being stripped back out."]
+    ]
+  },
+  area6: {
+    summary: "Central sandbar panorama showing one of the key comparison zones where flood water can quickly change access after low tide.",
+    stats: [
+      ["Main focus", "Sandbar crest and cut-throughs", "Use this view to examine exposed bar shape and the low channels that begin to refill first."],
+      ["Best for", "Post-low-tide response", "Helpful for understanding how quickly the visible landform starts to change once water returns."]
+    ],
+    details: [
+      ["What to look for", "Look for bar height, the position of shallow cut-throughs, and where returning water begins to break the exposed surface apart."],
+      ["Why it matters", "This is a strong area for explaining that apparent change can come from both real surface movement and the timing of flood water."],
+      ["Client takeaway", "If the bar stays broad and high across rounds, that suggests resilience or build-up; if channels open earlier or cut deeper, it can point to weakening or redistribution."]
+    ]
+  },
+  area7: {
+    summary: "Upper-inner estuary panorama showing a calmer reach where late-day survey windows still give useful comparisons as the tide returns.",
+    stats: [
+      ["Main focus", "Inner-estuary margins", "Useful for reading how exposed edges and quieter sediment zones are holding their shape."],
+      ["Best for", "Settling-zone checks", "This area helps show whether material is accumulating further inland rather than only at the mouth."]
+    ],
+    details: [
+      ["What to look for", "Look at the edge lines of exposed sediment, the width of the inner flats, and any signs that channels are tightening or spreading."],
+      ["Why it matters", "This reach often changes more gently than the entrance, so repeated patterns here can be especially informative."],
+      ["Client takeaway", "Steady build-up inland can suggest sediment is continuing to settle up-estuary, while retreating edges may point to reworking or wash-back."]
+    ]
+  },
+  area8: {
+    summary: "Wadebridge reach panorama covering the upper estuary where broad mudflat and channel-edge relationships are easiest to read.",
+    stats: [
+      ["Main focus", "Upper-estuary flats", "Use this panorama to compare how much of the upper estuary is exposed and where water is still holding."],
+      ["Best for", "Upper-reach context", "Helpful for explaining how the inland end of the system behaves differently from the outer mouth."]
+    ],
+    details: [
+      ["What to look for", "Look at the width of exposed upper flats, the channel edge position, and how much standing water remains across the reach."],
+      ["Why it matters", "This is a useful context view because the upper estuary often responds on a different timing and with different sediment behaviour than the outer sections."],
+      ["Client takeaway", "If the upper reach is staying wetter or narrower than expected, that can explain why some comparisons are weaker here than in the lower estuary."]
+    ]
+  }
+};
+
 function renderPanorama() {
   const survey = currentSurvey();
   const area = currentArea();
   const embedUrl = configuredPanoramaEmbed(survey.id, area.id);
   const hasEmbed = Boolean(String(embedUrl || "").trim());
+  const guide = PANORAMA_AREA_GUIDES[area.id] || {
+    summary: `Panorama view for ${area.label}.`,
+    stats: [
+      ["Main focus", area.label, "Area-specific panorama view."],
+      ["Best for", "Visual context", "Use this view alongside the imagery and sections panels."]
+    ],
+    details: [
+      ["What to look for", "Use this panorama as a visual context layer for the selected monitoring area."],
+      ["Why it matters", "It gives a client-friendly view of the area alongside the measured survey outputs."]
+    ]
+  };
 
   els.panoramaSummary.textContent = hasEmbed
-    ? `${survey.label} panorama for ${area.label} is loaded below. This is where the hosted 3DVista area tour can sit inside the monitoring system.`
-    : `${survey.label} panorama space is ready for ${area.label}, but no hosted tour URL has been linked yet.`;
+    ? guide.summary
+    : `${guide.summary} Hosted tour link still to be added.`;
 
   if (hasEmbed) {
     els.panoramaFrame.src = embedUrl;
@@ -2689,23 +2799,14 @@ function renderPanorama() {
     els.panoramaFrame.removeAttribute("src");
   }
 
-  els.panoramaStats.innerHTML = [
-    metric("Survey round", survey.shortDate || survey.label, "Current panorama context"),
-    metric("Area", `${area.overviewCode} - ${area.label}`, "Area-specific hosted tour"),
-    metric("Viewer status", hasEmbed ? "Linked" : "Waiting for URL", hasEmbed ? "Hosted panorama is ready to open" : "Add the hosted 3DVista URL when available")
-  ].join("");
+  els.panoramaStats.innerHTML = guide.stats
+    .map(([label, value, hint]) => metric(label, value, hint))
+    .join("");
 
-  els.panoramaDetails.innerHTML = hasEmbed
-    ? [
-        detail("What this page is for", "This panel hosts the area-specific 3DVista panorama so the monitoring system stays as the main front door while the immersive tour runs inside it."),
-        detail("Time-travel support", "If your hosted 3DVista tour includes older panoramas or round-to-round navigation, that can all live inside this same embedded viewer."),
-        detail("Current link", embedUrl)
-      ].join("")
-    : [
-        detail("What this page is for", "This panel is ready to host one panorama viewer per area and survey round, keeping the immersive content inside the monitoring system rather than sending people out to 3DVista first."),
-        detail("Next step", `Add the hosted 3DVista URL for ${area.label} in ${survey.label} to the panorama config and it will appear here automatically.`),
-        detail("Current state", "No panorama URL linked yet for this selected survey and area.")
-      ].join("");
+  els.panoramaDetails.innerHTML = [
+    ...guide.details.map(([label, value]) => detail(label, value)),
+    ...(hasEmbed ? [] : [detail("Current state", "No hosted panorama link has been added for this selected area yet.")])
+  ].join("");
 }
 
 async function renderVolumeLegacy() {
