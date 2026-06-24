@@ -67,6 +67,12 @@
             </span>
             <span class="tab__label">Weather</span>
           </button>
+          <button class="tab" data-tab="panorama" aria-label="Panoramas" title="Panoramas">
+            <span class="tab__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M4 18V7l4 2 4-2 4 2 4-2v11"/><path d="M4 18c2-1.5 4-2.2 6-2.2 2.1 0 4 .7 6 2.2 2-1.5 3.9-2.2 6-2.2"/><path d="M12 7v11"/></svg>
+            </span>
+            <span class="tab__label">Panoramas</span>
+          </button>
           <button class="tab" data-tab="volume" aria-label="Sandbar Volume Change" title="Sandbar Volume Change">
             <span class="tab__icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" focusable="false"><path d="M5 18V9"/><path d="M12 18V5"/><path d="M19 18v-7"/></svg>
@@ -223,6 +229,30 @@
           <div class="weather-frame-wrap section-gap">
             <iframe id="weatherFrame" class="weather-frame" title="Padstow weather and tide dashboard" loading="lazy"></iframe>
           </div>
+        </article>
+      </section>
+
+      <section class="tab-panel" data-panel="panorama">
+        <article class="panel panorama-shell">
+          <div class="panorama-shell__intro">
+            <div>
+              <p class="eyebrow">Immersive Area Tour</p>
+              <h2>Hosted Panorama Viewer</h2>
+              <p id="panoramaSummary" class="muted">Hosted panorama links will load here for the selected survey round and area.</p>
+            </div>
+            <div id="panoramaStats" class="stats-grid panorama-shell__stats"></div>
+          </div>
+          <div class="panorama-frame-wrap section-gap">
+            <iframe
+              id="panoramaFrame"
+              class="panorama-frame"
+              title="Area panorama viewer"
+              loading="lazy"
+              referrerpolicy="strict-origin-when-cross-origin"
+              allowfullscreen
+            ></iframe>
+          </div>
+          <div id="panoramaDetails" class="detail-list section-gap"></div>
         </article>
       </section>
 
@@ -450,8 +480,16 @@
                     <article class="section-difference-card">
                       <p class="eyebrow">Height Difference</p>
                       <p id="sectionDifferenceSurveyLabel" class="muted">Live comparison along this section.</p>
-                      <p id="sectionDifferenceValue" class="section-difference-card__value">--</p>
-                      <p id="sectionDifferenceText" class="section-difference-card__text muted">Tick another survey round to compare the same fixed section.</p>
+                      <div id="sectionDifferenceValue" class="section-difference-card__stack">
+                        <p class="section-difference-card__value">--</p>
+                      </div>
+                      <p id="sectionDifferenceText" class="section-difference-card__text muted">Tick one or more survey rounds to compare the same fixed section.</p>
+                    </article>
+                    <article class="section-trend-card section-trend-card--snapshot-source">
+                      <p class="eyebrow">Trend</p>
+                      <p id="sectionTrendLabel" class="section-trend-card__label">Awaiting comparison</p>
+                      <p id="sectionTrendText" class="muted">Tick one or more survey rounds to see whether this point is building up, eroding, or reversing.</p>
+                      <div id="sectionTrendMini" class="section-trend-mini" aria-hidden="true"></div>
                     </article>
                     <article class="section-difference-inset">
                       <div class="section-difference-inset__header">
@@ -468,6 +506,13 @@
                     <div id="sectionProfileControls" class="section-profile-controls"></div>
                   </div>
                   <div id="sectionProfileLegend" class="section-profile-legend"></div>
+                </div>
+                <div id="sectionComparisonQuickbar" class="section-comparison-quickbar hidden" aria-hidden="true">
+                  <div class="section-comparison-quickbar__copy">
+                    <p class="eyebrow">Section Snapshot</p>
+                    <p id="sectionComparisonQuickText" class="muted">Hover or tap the chart to open a plain-English snapshot for this point.</p>
+                  </div>
+                  <button id="sectionComparisonSnapshotBtn" class="chip" type="button">Open Snapshot</button>
                 </div>
               </div>
               <div id="sectionMetrics" class="stats-grid section-metric-strip section-gap"></div>

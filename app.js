@@ -58,16 +58,19 @@ import { volumeChangeSettings } from "./src/data/volumeChange.js?v=20260529g";
   activeTab: projectConfig.defaultState.activeTab,
   weatherFrameSrc: "",
   weatherFrameHeight: 0,
+  surveyTideSummaryCache: new Map(),
+  surveyTideSummaryRequests: new Map(),
   volumeViewMode: "comparison",
   jsonAssetCache: new Map(),
   processedSectionAssetCache: new Map(),
   processedHighlightAssetCache: new Map(),
   sectionTrackCache: new Map(),
-  sectionArea: null
+  sectionArea: null,
+  sectionComparisonSnapshot: null
     };
 
 const VALID_TABS = new Set(projectConfig.navigation.tabs);
-const AREA_ENABLED_TOOLBAR_TABS = new Set(["volume", "layers", "sections"]);
+const AREA_ENABLED_TOOLBAR_TABS = new Set(["panorama", "volume", "layers", "sections"]);
 
   const EXPLICIT_SECTION_IMAGE_TRACKS = {
     area1: [
@@ -125,7 +128,7 @@ const AREA_ENABLED_TOOLBAR_TABS = new Set(["volume", "layers", "sections"]);
 const SECTION_PROFILE_COLORS = [
   "#79a7ff",
   "#ff7f6e",
-  "#f4bf4f",
+  "#ffd84d",
   "#7ee0c0",
   "#c7a2ff",
   "#ff9ad5"
@@ -417,6 +420,10 @@ const els = {
   selectedAreaAssets: byId("selectedAreaAssets"),
   weatherSummary: byId("weatherSummary"),
   weatherFrame: byId("weatherFrame"),
+  panoramaSummary: byId("panoramaSummary"),
+  panoramaFrame: byId("panoramaFrame"),
+  panoramaStats: byId("panoramaStats"),
+  panoramaDetails: byId("panoramaDetails"),
   volumeSummary: byId("volumeSummary"),
   volumeSandboxBanner: byId("volumeSandboxBanner"),
   volumeMetricGrid: byId("volumeMetricGrid"),
@@ -500,9 +507,15 @@ const els = {
   profileChart: byId("profileChart"),
   sectionAnalysisGrid: byId("sectionAnalysisGrid"),
   sectionComparisonSummary: byId("sectionComparisonSummary"),
+  sectionComparisonQuickbar: byId("sectionComparisonQuickbar"),
+  sectionComparisonQuickText: byId("sectionComparisonQuickText"),
+  sectionComparisonSnapshotBtn: byId("sectionComparisonSnapshotBtn"),
   sectionDifferenceSurveyLabel: byId("sectionDifferenceSurveyLabel"),
   sectionDifferenceValue: byId("sectionDifferenceValue"),
   sectionDifferenceText: byId("sectionDifferenceText"),
+  sectionTrendLabel: byId("sectionTrendLabel"),
+  sectionTrendText: byId("sectionTrendText"),
+  sectionTrendMini: byId("sectionTrendMini"),
   sectionDifferenceRange: byId("sectionDifferenceRange"),
   sectionDifferenceInset: byId("sectionDifferenceInset"),
   sectionMetrics: byId("sectionMetrics"),
@@ -837,6 +850,18 @@ function bindEvents() {
   });
   els.sectionInsightOverlayClose.addEventListener("click", closeSectionInsightOverlay);
   els.sectionInsightOverlayBackdrop.addEventListener("click", closeSectionInsightOverlay);
+  els.sectionComparisonSnapshotBtn?.addEventListener("click", () => {
+    if (!state.sectionComparisonSnapshot) {
+      return;
+    }
+    openSectionInsightOverlay(
+      state.sectionComparisonSnapshot.eyebrow,
+      state.sectionComparisonSnapshot.title,
+      state.sectionComparisonSnapshot.summary,
+      state.sectionComparisonSnapshot.body,
+      true
+    );
+  });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       closeSectionInsightOverlay();
@@ -1033,6 +1058,7 @@ function renderAll() {
   renderOverview();
   renderAreas();
   renderWeather();
+  renderPanorama();
   renderVolume();
   renderLayers();
   renderSections();
@@ -1064,7 +1090,7 @@ async function renderShellStage() {
   const areaHeroEnabled = AREA_ENABLED_TOOLBAR_TABS.has(state.activeTab);
   const configuredAreaHero = configuredAreaHeroImage(survey.id, area.id);
   const useOverviewHero = overviewHeroTabs.has(state.activeTab) || (!configuredAreaHero && areaHeroEnabled);
-  const configuredOverviewImage = projectConfig.branding?.overviewHeroImagePath || "";
+  const configuredOverviewImage = configuredOverviewHeroImage(stageSurvey?.id || survey.id);
   const configuredAreaHeroDirection = configuredAreaHeroArtDirection(survey.id, area.id);
   if (shellRoot) {
     shellRoot.dataset.activeTab = state.activeTab;
@@ -1157,6 +1183,12 @@ function configuredAreaHeroArtDirection(surveyId, areaId) {
   return projectConfig.branding?.areaHeroArtDirectionBySurvey?.[surveyId]?.[areaId] || null;
 }
 
+function configuredOverviewHeroImage(surveyId) {
+  return projectConfig.branding?.overviewHeroImagePathBySurvey?.[surveyId]
+    || projectConfig.branding?.overviewHeroImagePath
+    || "";
+}
+
 function activeTabShellMeta() {
   const project = currentProject();
   const survey = currentSurvey();
@@ -1178,6 +1210,11 @@ function activeTabShellMeta() {
       eyebrow: "Environmental Context",
       title: "Survey Conditions",
       summary: "Weather, tide, and timing context help explain what the landscape was doing when this survey round was captured."
+    },
+    panorama: {
+      eyebrow: "Immersive Area Tour",
+      title: "Panorama Viewer",
+      summary: `Open a hosted 360 tour for ${area.label} so clients can look around the area directly and, where available, move back through time inside the same experience.`
     },
     volume: {
       eyebrow: "Change Reporting",
@@ -1265,7 +1302,7 @@ async function renderOverview() {
   els.overviewIndexMenu.classList.toggle("hidden", !state.overviewIndexOpen);
   els.overviewIndexMenu.setAttribute("aria-hidden", state.overviewIndexOpen ? "false" : "true");
 
-  els.metricGrid.innerHTML = overviewMode.glance.map(([label, value]) => metric(label, value, "")).join("");
+  setOverviewGlance(overviewMode.glance);
 
   els.overviewContentsGrid.innerHTML = overviewMode.story.map((item, index) => `
     <button class="overview-index-item" type="button" data-story-target="${escapeHtml(item.id || `section-${index + 1}`)}">
@@ -1283,15 +1320,6 @@ async function renderOverview() {
       });
     });
   });
-
-  if (els.overviewGlanceGrid) {
-    els.overviewGlanceGrid.innerHTML = overviewMode.glance.map(([label, value]) => `
-      <article class="card overview-glance-card">
-        <p class="muted">${escapeHtml(label)}</p>
-        <h3>${escapeHtml(value)}</h3>
-      </article>
-    `).join("");
-  }
 
   els.overviewStory.innerHTML = overviewMode.story.map((item, index) => `
     <article id="${escapeHtml(item.id || `section-${index + 1}`)}" class="card overview-story-card">
@@ -1391,6 +1419,8 @@ async function renderOverview() {
     `<div class="timeline-item"><div><strong>3.</strong></div><div>Use <strong>Sections</strong> when you want to understand the height and shape of the ground along a fixed line.</div></div>`,
     `<div class="timeline-item"><div><strong>4.</strong></div><div>Use <strong>Information</strong> and <strong>Help</strong> whenever you want the project story or a plain-English guide.</div></div>`
   ].join("");
+
+  enhanceOverviewGlanceWithConfirmedTides(survey, overviewMode.glance, state.overviewMode);
 }
 
 const INFORMATION_STORY = [
@@ -1734,6 +1764,70 @@ const SURVEY_SPECIFIC_OVERVIEW = {
         ]
       }
     ]
+  },
+  "2026-06-16": {
+    heroTitle: "What Survey Round 3 proved about route planning",
+    heroText: "This survey-specific view captures what the June repeat taught us after a longer-than-intended gap between rounds. More importantly, it shows that the route logic for future scans is now much clearer and more reliable.",
+    storyTitle: "Survey Round 3 Learnings",
+    contentsSubtext: "Use this view to see how the team handled the long wait for a weather window, what changed in the route planning, and why this round now feels like a turning point for future survey days.",
+    glance: [
+      ["Survey window", "16-17 Jun 2026"],
+      ["Main delay", "Long gap caused by weather and tide mismatch"],
+      ["Day 1 route", "Tregirls Beach first, then work inland"],
+      ["Day 2 route", "Daymer Bay first, then work inland"],
+      ["Best outcome", "Completed in two days despite uncertain weather"],
+      ["Next change", "Keep the new outward-to-inland route pattern"]
+    ],
+    story: [
+      {
+        id: "round3-overview",
+        title: "Why This Round Mattered So Much",
+        paragraphs: [
+          "Survey Round 3 followed a much longer gap than originally intended. The aim had been to keep the repeat interval closer to around 30 days, but the tides and the weather did not align well enough for that to happen.",
+          "By the time the June survey went ahead, the gap had stretched to roughly 50 days. That made it important to return to the estuary and secure the next full dataset, even though the forecast window became less comfortable only a few days before the survey."
+        ]
+      },
+      {
+        id: "round3-weather",
+        title: "Weather Stayed Under Review The Whole Time",
+        paragraphs: [
+          "The forecast had looked more favourable earlier on, but the workable window narrowed shortly before the survey. Even so, the decision was made to proceed, with the understanding that a third day would be used if necessary rather than lose the opportunity altogether.",
+          "In practice, both days remained workable. There were gusts, some very light rain, and a few moments where low cloud or mist triggered visibility warnings from the drone, but the aircraft performed well overall and the imagery stayed clear enough to keep the survey moving."
+        ]
+      },
+      {
+        id: "round3-route",
+        title: "The Route Was Reworked Around How The Estuary Fills",
+        paragraphs: [
+          "One of the biggest changes in June was the route logic. In earlier rounds, some of the more seaward areas had often been left until later, but by that stage the lower estuary can refill quickly enough to weaken the comparison window.",
+          "For this round, Day 1 began at Tregirls Beach and then worked inland. Day 2 began at Daymer Bay and then also worked inland. That meant the more seaward blocks were captured earlier, around an hour and a half before low tide, giving a better chance of seeing more of Doom Bar, the beaches, and the outer exposed ground before the water pushed back in."
+        ]
+      },
+      {
+        id: "round3-tide-window",
+        title: "The Tide Strategy Was More Deliberate",
+        paragraphs: [
+          "The normal target window still sits roughly around two hours before to two hours after low tide, but this round showed that the outer areas benefit from being flown earlier within that range. Starting them well before low water gave a stronger view of the sea-edge features than waiting until later in the cycle.",
+          "At the same time, the inland areas such as Areas 7 and 8 appear to remain usable for longer after low tide because the estuary refills there more slowly. That balance worked well across both June survey days and helped the team use the tide more effectively than in the earlier rounds."
+        ]
+      },
+      {
+        id: "round3-access",
+        title: "Access Planning Also Became Clearer",
+        paragraphs: [
+          "The June round also helped confirm more of the on-the-ground access method. Some cycling was still used, but less than before, and the Wadebridge block was tested by parking in Wadebridge and walking down instead.",
+          "That worked, although the end of Day 2 showed that the walk was longer than it feels when moving by bike. Even so, the round added more confidence about where to leave the Camel Trail, where to drop onto the estuary, and how those access choices affect the timing of the day."
+        ]
+      },
+      {
+        id: "round3-what-it-proved",
+        title: "What Survey Round 3 Proved For Future Surveys",
+        paragraphs: [
+          "The biggest success of this round is that the route planning now feels much more settled. It matters less which calendar day is called Day 1 or Day 2, because the team now understands the sequence that works best through the estuary.",
+          "The June survey showed that the outward-to-inland route is the stronger pattern, that the upper estuary often provides calmer flying conditions than the sea edge, and that the team now has a much clearer playbook for future repeat rounds. Completing the whole survey in two days, despite the uncertainty leading into it, was a strong result."
+        ]
+      }
+    ]
   }
 };
 
@@ -1753,11 +1847,151 @@ const OVERVIEW_GLANCE_BY_SURVEY = {
     ["Low tide reference", "12:56 Day 1 - -0.15 m | 13:35 Day 2 - -0.09 m"],
     ["Images captured", "6,102 photos"],
     ["Air time overall", "320.80 minutes"]
+  ],
+  "2026-06-16": [
+    ["High tide reference", "Survey-specific high tide summary pending"],
+    ["Total mapped area", "7.25 km2"],
+    ["Survey dates", "16-17 June 2026"],
+    ["Low tide reference", "13:22 Day 1 (provisional) | 14:10 Day 2 (provisional)"],
+    ["Images captured", "6,405 photos"],
+    ["Air time overall", "321.22 minutes"],
+    ["Operational result", "Completed in two days"]
   ]
 };
 
 function overviewGlanceForSurvey(surveyId) {
   return OVERVIEW_GLANCE_BY_SURVEY[surveyId] || OVERVIEW_GLANCE_BY_SURVEY["2026-03-22"];
+}
+
+function setOverviewGlance(glance = []) {
+  els.metricGrid.innerHTML = glance.map(([label, value]) => metric(label, value, "")).join("");
+  if (!els.overviewGlanceGrid) return;
+  els.overviewGlanceGrid.innerHTML = glance.map(([label, value]) => `
+    <article class="card overview-glance-card">
+      <p class="muted">${escapeHtml(label)}</p>
+      <h3>${escapeHtml(value)}</h3>
+    </article>
+  `).join("");
+}
+
+function glanceRowsWithTideSummary(glance = [], tideSummary = null) {
+  if (!tideSummary) return glance;
+  return glance.map(([label, value]) => {
+    if (label === "High tide reference" && tideSummary.high) return [label, tideSummary.high];
+    if (label === "Low tide reference" && tideSummary.low) return [label, tideSummary.low];
+    return [label, value];
+  });
+}
+
+async function enhanceOverviewGlanceWithConfirmedTides(survey, glance, overviewMode) {
+  const tideSummary = await confirmedSurveyTideSummary(survey);
+  if (!tideSummary) return;
+  if (state.activeTab !== "overview") return;
+  if (state.surveyId !== survey.id) return;
+  if (state.overviewMode !== overviewMode) return;
+  setOverviewGlance(glanceRowsWithTideSummary(glance, tideSummary));
+}
+
+async function confirmedSurveyTideSummary(survey) {
+  if (!survey?.dateFrom || !survey?.dateTo) return null;
+  if (window.location.protocol === "file:") return null;
+  if (state.surveyTideSummaryCache.has(survey.id)) {
+    return state.surveyTideSummaryCache.get(survey.id);
+  }
+  if (state.surveyTideSummaryRequests.has(survey.id)) {
+    return state.surveyTideSummaryRequests.get(survey.id);
+  }
+
+  const request = (async () => {
+    try {
+      const url = new URL("/api/tides", window.location.origin);
+      url.searchParams.set("start_date", survey.dateFrom);
+      url.searchParams.set("end_date", survey.dateTo);
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        throw new Error(`Tide lookup failed with status ${response.status}`);
+      }
+      const payload = await response.json();
+      const extremes = (payload.extremes || [])
+        .map((item) => ({
+          time: item.time,
+          value: Number(item.value),
+          type: item.type
+        }))
+        .filter((item) => item.time && Number.isFinite(item.value) && item.type);
+      const summary = summariseSurveyTideExtremes(survey, extremes);
+      state.surveyTideSummaryCache.set(survey.id, summary);
+      return summary;
+    } catch (error) {
+      console.warn("Could not confirm survey tide summary.", error);
+      state.surveyTideSummaryCache.set(survey.id, null);
+      return null;
+    } finally {
+      state.surveyTideSummaryRequests.delete(survey.id);
+    }
+  })();
+
+  state.surveyTideSummaryRequests.set(survey.id, request);
+  return request;
+}
+
+function summariseSurveyTideExtremes(survey, extremes = []) {
+  const dayKeys = surveyDateKeys(survey);
+  if (!dayKeys.length) return null;
+  const highs = dayKeys.map((dayKey, index) => formatSurveyDayExtreme(extremes, "High", dayKey, index));
+  const lows = dayKeys.map((dayKey, index) => formatSurveyDayExtreme(extremes, "Low", dayKey, index));
+  return {
+    high: highs.every(Boolean) ? highs.join(" | ") : null,
+    low: lows.every(Boolean) ? lows.join(" | ") : null
+  };
+}
+
+function surveyDateKeys(survey) {
+  const start = new Date(`${survey?.dateFrom}T12:00:00`);
+  const end = new Date(`${survey?.dateTo || survey?.dateFrom}T12:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+    return [];
+  }
+  const keys = [];
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    keys.push(cursor.toISOString().slice(0, 10));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return keys;
+}
+
+function formatSurveyDayExtreme(extremes, type, dayKey, index) {
+  const item = extremes.find((entry) => entry.type === type && tideDayKey(entry.time) === dayKey);
+  if (!item) return null;
+  return `${formatTideClock(item.time)} Day ${index + 1} - ${fixed(item.value, 2)} m`;
+}
+
+function tideDayKey(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/London",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  const parts = formatter.formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return year && month && day ? `${year}-${month}-${day}` : "";
+}
+
+function formatTideClock(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "n/a";
+  return date.toLocaleTimeString("en-GB", {
+    timeZone: "Europe/London",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  });
 }
 
 function getOverviewModePayload(project) {
@@ -2392,7 +2626,7 @@ async function renderSections() {
       eyebrow: "Survey Context",
       title: "Survey context",
       summary: `${survey.shortDate} around low tide at ${area.lowTide}.`,
-      body: `${survey.label} captured this area around low tide at ${area.lowTide}. ${activeProfiles.length > 1 ? "Use the survey profile toggles above the chart to compare rounds along the same fixed line. " : ""}${area.surveyNotes}`
+      body: `${survey.label} captured this area around low tide at ${area.lowTide}. ${activeProfiles.length > 1 ? "Use the survey profile toggles above the chart to compare up to three rounds along the same fixed line. " : ""}${area.surveyNotes}`
     })
   ].join("");
   drawSectionChart(activeProfiles, section, survey.id);
@@ -2433,6 +2667,45 @@ function renderWeather() {
     state.weatherFrameSrc = src;
     els.weatherFrame.src = src;
   }
+}
+
+function configuredPanoramaEmbed(surveyId, areaId) {
+  return projectConfig.branding?.panoramaEmbedsBySurvey?.[surveyId]?.[areaId] || "";
+}
+
+function renderPanorama() {
+  const survey = currentSurvey();
+  const area = currentArea();
+  const embedUrl = configuredPanoramaEmbed(survey.id, area.id);
+  const hasEmbed = Boolean(String(embedUrl || "").trim());
+
+  els.panoramaSummary.textContent = hasEmbed
+    ? `${survey.label} panorama for ${area.label} is loaded below. This is where the hosted 3DVista area tour can sit inside the monitoring system.`
+    : `${survey.label} panorama space is ready for ${area.label}, but no hosted tour URL has been linked yet.`;
+
+  if (hasEmbed) {
+    els.panoramaFrame.src = embedUrl;
+  } else {
+    els.panoramaFrame.removeAttribute("src");
+  }
+
+  els.panoramaStats.innerHTML = [
+    metric("Survey round", survey.shortDate || survey.label, "Current panorama context"),
+    metric("Area", `${area.overviewCode} - ${area.label}`, "Area-specific hosted tour"),
+    metric("Viewer status", hasEmbed ? "Linked" : "Waiting for URL", hasEmbed ? "Hosted panorama is ready to open" : "Add the hosted 3DVista URL when available")
+  ].join("");
+
+  els.panoramaDetails.innerHTML = hasEmbed
+    ? [
+        detail("What this page is for", "This panel hosts the area-specific 3DVista panorama so the monitoring system stays as the main front door while the immersive tour runs inside it."),
+        detail("Time-travel support", "If your hosted 3DVista tour includes older panoramas or round-to-round navigation, that can all live inside this same embedded viewer."),
+        detail("Current link", embedUrl)
+      ].join("")
+    : [
+        detail("What this page is for", "This panel is ready to host one panorama viewer per area and survey round, keeping the immersive content inside the monitoring system rather than sending people out to 3DVista first."),
+        detail("Next step", `Add the hosted 3DVista URL for ${area.label} in ${survey.label} to the panorama config and it will appear here automatically.`),
+        detail("Current state", "No panorama URL linked yet for this selected survey and area.")
+      ].join("");
 }
 
 async function renderVolumeLegacy() {
@@ -3295,6 +3568,7 @@ function updateArea(areaId) {
   fillSelect(els.areaSelect, areaSelectOptions(), state.areaId);
   renderShellStage();
   renderAreas();
+  renderPanorama();
   renderVolume();
   renderLayers();
   renderSections();
@@ -3335,7 +3609,7 @@ function renderAdminIfEnabled() {
 
 function normaliseSectionId(value) {
   const text = String(value || "").trim();
-  const match = text.match(/^A(\d+)-?(\d{2})$/i);
+  const match = text.match(/^A(\d+)-?(\d{2})$/i) || text.match(/^A(\d)(\d{2})$/i);
   if (!match) {
     return text;
   }
@@ -3347,8 +3621,20 @@ async function loadSectionRows(path, sectionId) {
     if (!response.ok) return [];
     const text = await response.text();
     const targetSectionId = normaliseSectionId(sectionId);
-    return text.trim().split(/\r?\n/).slice(1).map((line) => {
-      const [currentSectionId, label, sortOrder, height, distance] = line.split(",");
+    const lines = text.trim().split(/\r?\n/);
+    const headers = (lines[0] || "").split(",").map((item) => item.trim().toLowerCase());
+    const sectionIndex = headers.indexOf("section_id");
+    const labelIndex = headers.indexOf("label");
+    const sortOrderIndex = headers.indexOf("sort_order");
+    const heightIndex = headers.indexOf("height_m");
+    const distanceIndex = headers.indexOf("distance_m") >= 0 ? headers.indexOf("distance_m") : headers.indexOf("discance_m");
+    return lines.slice(1).map((line) => {
+      const columns = line.split(",");
+      const currentSectionId = columns[sectionIndex] ?? columns[0];
+      const label = columns[labelIndex] ?? columns[1];
+      const sortOrder = columns[sortOrderIndex] ?? columns[2];
+      const height = columns[heightIndex] ?? columns[3];
+      const distance = columns[distanceIndex] ?? columns[4];
       return {
         sectionId: normaliseSectionId(currentSectionId),
         label,
@@ -3475,59 +3761,304 @@ function focusedSectionComparison(anchorProfile, comparisonProfiles, hoverDistan
   }, null);
 }
 
+function sectionComparisonPairs(activeProfiles, hoverDistance = state.sectionHoverDistance) {
+  if (activeProfiles.length < 2) {
+    return [];
+  }
+
+  const orderedProfiles = [...activeProfiles].sort((left, right) => (
+    String(left.survey.dateFrom || left.survey.id).localeCompare(String(right.survey.dateFrom || right.survey.id))
+  ));
+
+  return orderedProfiles.flatMap((profile, index) => {
+    const nextProfile = orderedProfiles[index + 1];
+    if (!nextProfile) {
+      return [];
+    }
+    const differences = buildSectionDifferenceSeries(profile.rows, nextProfile.rows);
+    if (!differences.length) {
+      return [];
+    }
+    const focusDifference = Number.isFinite(hoverDistance)
+      ? nearestSectionRow(differences, hoverDistance)
+      : differences.reduce((best, row) => (
+        Math.abs(row.delta) > Math.abs(best.delta) ? row : best
+      ), differences[0]);
+    if (!focusDifference) {
+      return [];
+    }
+    return [{
+      fromProfile: profile,
+      toProfile: nextProfile,
+      focusDifference
+    }];
+  });
+}
+
 function sectionInsetWindowRows(rows, centerDistance, radius = 6) {
   return rows.filter((row) => Math.abs(row.distance - centerDistance) <= radius);
 }
 
+function classifySectionTrend(steps) {
+  const significantSteps = steps.map((step) => ({
+    ...step,
+    direction: step.delta > 0.03 ? "up" : step.delta < -0.03 ? "down" : "flat"
+  }));
+  const directions = significantSteps.map((step) => step.direction);
+  const nonFlat = directions.filter((direction) => direction !== "flat");
+
+  if (!nonFlat.length) {
+    return {
+      label: "Mostly stable",
+      text: "The selected point changes very little across the active survey rounds, so this looks broadly stable rather than clearly building up or eroding."
+    };
+  }
+
+  if (nonFlat.every((direction) => direction === "up")) {
+    return {
+      label: "Consistent build-up",
+      text: "Each active survey sits a little higher than the one before it, suggesting repeated build-up at this point."
+    };
+  }
+
+  if (nonFlat.every((direction) => direction === "down")) {
+    return {
+      label: "Consistent erosion",
+      text: "Each active survey sits lower than the one before it, suggesting repeated lowering or erosion at this point."
+    };
+  }
+
+  if (nonFlat[0] === "up" && nonFlat.includes("down")) {
+    return {
+      label: "Build then erosion",
+      text: "The point rises in one step and then drops back in a later step, so the change is not consistently building in one direction."
+    };
+  }
+
+  if (nonFlat[0] === "down" && nonFlat.includes("up")) {
+    return {
+      label: "Erosion then build",
+      text: "The point drops first and then rises later, so the change appears to reverse rather than continue steadily."
+    };
+  }
+
+  return {
+    label: "Mixed change",
+    text: "The active survey rounds do not show one simple direction of change here, so this point is best read as mixed or reversing."
+  };
+}
+
+function renderSectionTrendMini(steps, orderedProfiles) {
+  if (!els.sectionTrendMini) {
+    return;
+  }
+  const maxHeight = Math.max(...orderedProfiles.map((profile) => profile.heightAtFocus));
+  const minHeight = Math.min(...orderedProfiles.map((profile) => profile.heightAtFocus));
+  const span = Math.max(0.12, maxHeight - minHeight);
+  els.sectionTrendMini.innerHTML = orderedProfiles.map((profile) => {
+    const barHeight = 14 + (((profile.heightAtFocus - minHeight) / span) * 38);
+    return `
+      <div class="section-trend-mini__step">
+        <div class="section-trend-mini__bar" style="height:${fixed(barHeight, 1)}px;background:${profile.color}"></div>
+        <span class="section-trend-mini__label">${escapeHtml(profile.survey.shortDate || profile.survey.label)}</span>
+      </div>
+    `;
+  }).join("");
+}
+
+function openCurrentSectionComparisonSnapshot() {
+  if (!state.sectionComparisonSnapshot) {
+    return;
+  }
+  openSectionInsightOverlay(
+    state.sectionComparisonSnapshot.eyebrow,
+    state.sectionComparisonSnapshot.title,
+    state.sectionComparisonSnapshot.summary,
+    state.sectionComparisonSnapshot.body,
+    true
+  );
+}
+
+function sectionComparisonWarnings(orderedProfiles) {
+  const warnings = [];
+  const hasWaterSegment = orderedProfiles.some((profile) => profile.heightAtFocus <= -2.99);
+  const hasBeyondSurveySegment = orderedProfiles.some((profile) => profile.heightAtFocus === 0);
+
+  if (hasWaterSegment) {
+    warnings.push("Flat -3 m stretches usually mark water, so they are not reliable for comparison.");
+  }
+
+  if (hasBeyondSurveySegment) {
+    warnings.push("Dotted or zero-height stretches usually mark where the survey area ended, so they are not reliable for comparison.");
+  }
+
+  return warnings;
+}
+
 function renderSectionComparisonSummary(profiles, anchorSurveyId = state.surveyId) {
   const activeProfiles = profiles.filter((profile) => profile.selected && profile.rows.length);
-  const anchorProfile = activeProfiles.find((profile) => profile.survey.id === anchorSurveyId) || activeProfiles[0];
-  const comparisonProfiles = activeProfiles.filter((profile) => profile.survey.id !== anchorProfile?.survey.id);
-  const focusedProfile = focusedSectionComparison(anchorProfile, comparisonProfiles);
+  const comparisonPairs = sectionComparisonPairs(activeProfiles);
 
-  if (!focusedProfile || !anchorProfile?.rows?.length) {
+  if (!comparisonPairs.length) {
     els.sectionComparisonSummary.classList.add("hidden");
     els.sectionAnalysisGrid.classList.remove("section-analysis-grid--with-comparison");
-    els.sectionDifferenceValue.textContent = "--";
-    els.sectionDifferenceValue.style.color = "";
+    state.sectionComparisonSnapshot = null;
+    els.sectionDifferenceValue.innerHTML = `<p class="section-difference-card__value">--</p>`;
     els.sectionDifferenceSurveyLabel.textContent = "Live comparison along this section.";
-    els.sectionDifferenceText.textContent = "Tick another survey round to compare the same fixed section.";
+    els.sectionDifferenceText.textContent = "Tick one or more survey rounds to compare the same fixed section.";
+    els.sectionTrendLabel.textContent = "Awaiting comparison";
+    els.sectionTrendText.textContent = "Tick one or more survey rounds to see whether this point is building up, eroding, or reversing.";
+    els.sectionTrendMini.innerHTML = "";
     els.sectionDifferenceRange.textContent = "A short window around the current cursor position.";
     els.sectionDifferenceInset.innerHTML = "";
     return;
   }
 
-  const focusDistance = focusedProfile.focusDifference.distance;
-  const anchorRow = nearestSectionRow(anchorProfile.rows, focusDistance);
-  const compareRow = nearestSectionRow(focusedProfile.rows, focusDistance);
-  if (!anchorRow || !compareRow) {
+  const focusDistance = comparisonPairs.reduce((best, pair) => {
+    if (!best) {
+      return pair.focusDifference;
+    }
+    return Math.abs(pair.focusDifference.delta) > Math.abs(best.delta)
+      ? pair.focusDifference
+      : best;
+  }, null)?.distance;
+
+  if (!Number.isFinite(focusDistance)) {
     els.sectionComparisonSummary.classList.add("hidden");
     els.sectionAnalysisGrid.classList.remove("section-analysis-grid--with-comparison");
+    state.sectionComparisonSnapshot = null;
+    els.sectionTrendMini.innerHTML = "";
     els.sectionDifferenceInset.innerHTML = "";
     return;
   }
 
-  const delta = compareRow.height - anchorRow.height;
-  const leadingColor = delta > 0.005
-    ? focusedProfile.color
-    : delta < -0.005
-      ? anchorProfile.color
-      : "#eef4ff";
-  const directionText = delta > 0.005
-    ? `${focusedProfile.survey.shortDate || focusedProfile.survey.label} is above ${anchorProfile.survey.shortDate || anchorProfile.survey.label}`
-    : delta < -0.005
-      ? `${anchorProfile.survey.shortDate || anchorProfile.survey.label} is above ${focusedProfile.survey.shortDate || focusedProfile.survey.label}`
-      : `${focusedProfile.survey.shortDate || focusedProfile.survey.label} matches ${anchorProfile.survey.shortDate || anchorProfile.survey.label}`;
+  const focusedPairs = comparisonPairs.flatMap((pair) => {
+    const fromRow = nearestSectionRow(pair.fromProfile.rows, focusDistance);
+    const toRow = nearestSectionRow(pair.toProfile.rows, focusDistance);
+    if (!fromRow || !toRow) {
+      return [];
+    }
+    const delta = toRow.height - fromRow.height;
+    const leadingColor = delta > 0.005
+      ? pair.toProfile.color
+      : delta < -0.005
+        ? pair.fromProfile.color
+        : "#eef4ff";
+    const directionText = delta > 0.005
+      ? `${pair.toProfile.survey.shortDate || pair.toProfile.survey.label} is above ${pair.fromProfile.survey.shortDate || pair.fromProfile.survey.label}`
+      : delta < -0.005
+        ? `${pair.fromProfile.survey.shortDate || pair.fromProfile.survey.label} is above ${pair.toProfile.survey.shortDate || pair.toProfile.survey.label}`
+        : `${pair.toProfile.survey.shortDate || pair.toProfile.survey.label} matches ${pair.fromProfile.survey.shortDate || pair.fromProfile.survey.label}`;
+    return [{
+      ...pair,
+      fromRow,
+      toRow,
+      delta,
+      leadingColor,
+      directionText
+    }];
+  });
+
+  if (!focusedPairs.length) {
+    els.sectionComparisonSummary.classList.add("hidden");
+    els.sectionAnalysisGrid.classList.remove("section-analysis-grid--with-comparison");
+    state.sectionComparisonSnapshot = null;
+    els.sectionTrendMini.innerHTML = "";
+    els.sectionDifferenceInset.innerHTML = "";
+    return;
+  }
+
+  const orderedProfiles = [...new Map(focusedPairs.flatMap((pair) => [
+    [pair.fromProfile.survey.id, pair.fromProfile],
+    [pair.toProfile.survey.id, pair.toProfile]
+  ])).values()]
+    .map((profile) => {
+      const focusRow = nearestSectionRow(profile.rows, focusDistance);
+      return focusRow
+        ? { ...profile, heightAtFocus: focusRow.height }
+        : null;
+    })
+    .filter(Boolean)
+    .sort((left, right) => String(left.survey.dateFrom || left.survey.id).localeCompare(String(right.survey.dateFrom || right.survey.id)));
+
+  const trend = classifySectionTrend(focusedPairs);
+  const warnings = sectionComparisonWarnings(orderedProfiles);
 
   els.sectionComparisonSummary.classList.remove("hidden");
   els.sectionAnalysisGrid.classList.add("section-analysis-grid--with-comparison");
-  els.sectionDifferenceSurveyLabel.textContent = `Comparing ${focusedProfile.survey.shortDate || focusedProfile.survey.label} against ${anchorProfile.survey.shortDate || anchorProfile.survey.label}.`;
-  els.sectionDifferenceValue.textContent = `${delta >= 0 ? "+" : ""}${fixed(delta, 2)} m`;
-  els.sectionDifferenceValue.style.color = leadingColor;
-  els.sectionDifferenceText.textContent = `${directionText} at ${fixed(focusDistance, 1)} m along the same fixed section.`;
+  els.sectionDifferenceSurveyLabel.textContent = "";
+  els.sectionDifferenceValue.innerHTML = focusedPairs.map((pair) => `
+    <div class="section-difference-card__row">
+      <span class="section-difference-card__row-label">${escapeHtml(`${pair.fromProfile.survey.shortDate || pair.fromProfile.survey.label} to ${pair.toProfile.survey.shortDate || pair.toProfile.survey.label}`)}</span>
+      <p class="section-difference-card__value" style="color:${pair.leadingColor}">${pair.delta >= 0 ? "+" : ""}${fixed(pair.delta, 2)} m</p>
+    </div>
+  `).join("");
+  els.sectionDifferenceText.textContent = "";
+  els.sectionTrendLabel.textContent = trend.label;
+  els.sectionTrendText.textContent = `${trend.text} At ${fixed(focusDistance, 1)} m along the section, the active profile point is being compared across ${orderedProfiles.length} survey rounds.`;
+  renderSectionTrendMini(focusedPairs, orderedProfiles);
   els.sectionDifferenceRange.textContent = `Local zoom from ${fixed(Math.max(0, focusDistance - 6), 1)} m to ${fixed(focusDistance + 6, 1)} m.`;
 
-  drawSectionDifferenceInset(anchorProfile, focusedProfile, focusDistance);
+  drawSectionDifferenceInset(
+    orderedProfiles,
+    focusDistance
+  );
+
+  const localZoomMarkup = els.sectionDifferenceInset.innerHTML
+    ? `
+      <div class="section-snapshot-localzoom">
+        <strong>Local zoom</strong>
+        <p>${escapeHtml(`Snapshot from ${fixed(Math.max(0, focusDistance - 6), 1)} m to ${fixed(focusDistance + 6, 1)} m around the selected point.`)}</p>
+        <svg viewBox="0 0 380 150" role="img" aria-label="Local section comparison zoom snapshot">${els.sectionDifferenceInset.innerHTML}</svg>
+      </div>
+    `
+    : "";
+
+  const snapshotBody = `
+    <div class="section-snapshot-body">
+      <div class="detail-list">
+        <div class="detail-item">
+          <strong>Trend</strong>
+          <p>${escapeHtml(trend.label)}</p>
+        </div>
+        <div class="detail-item">
+          <strong>What it suggests</strong>
+          <p>${escapeHtml(trend.text)}</p>
+        </div>
+        <div class="detail-item">
+          <strong>Point along section</strong>
+          <p>${escapeHtml(`${fixed(focusDistance, 1)} m along the fixed section line.`)}</p>
+        </div>
+        ${warnings.length ? `
+          <div class="detail-item">
+            <strong>Use with caution</strong>
+            <p>${escapeHtml(warnings.join(" "))}</p>
+          </div>
+        ` : ""}
+      </div>
+      <div class="detail-list">
+        ${focusedPairs.map((pair) => `
+          <div class="detail-item">
+            <strong>${escapeHtml(`${pair.fromProfile.survey.shortDate || pair.fromProfile.survey.label} to ${pair.toProfile.survey.shortDate || pair.toProfile.survey.label}`)}</strong>
+            <p>${escapeHtml(`${pair.delta >= 0 ? "+" : ""}${fixed(pair.delta, 2)} m. ${pair.directionText}.`)}</p>
+          </div>
+        `).join("")}
+      </div>
+      <div class="detail-list">
+        <div class="detail-item">
+          <strong>Local window</strong>
+          <p>${escapeHtml(`This snapshot focuses on ${fixed(Math.max(0, focusDistance - 6), 1)} m to ${fixed(focusDistance + 6, 1)} m around the selected point.`)}</p>
+        </div>
+      </div>
+      ${localZoomMarkup}
+    </div>
+  `;
+  state.sectionComparisonSnapshot = {
+    eyebrow: "Section Snapshot",
+    title: trend.label,
+    summary: `${fixed(focusDistance, 1)} m along ${state.sectionId}. ${orderedProfiles.length} active survey rounds compared.`,
+    body: snapshotBody
+  };
 }
 
 function drawChart(profiles) {
@@ -3756,8 +4287,8 @@ function drawSectionChart(profiles, section, anchorSurveyId = state.surveyId) {
       .filter((segment) => segment.length >= 2)
       .map((segment) => {
         const strokeWidth = isComparisonMode
-          ? (profile.survey.id === anchorSurveyId ? 2 : 1.7)
-          : 3;
+          ? (profile.survey.id === anchorSurveyId ? 1.6 : 1.35)
+          : 2.2;
         return `<polyline fill="none" stroke="${profile.color}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" points="${buildPointString(segment)}"/>`;
       })
       .join("");
@@ -3765,9 +4296,9 @@ function drawSectionChart(profiles, section, anchorSurveyId = state.surveyId) {
       .map((segment) => {
         if (segment.length === 1) {
           const point = segment[0];
-          return `<circle cx="${fixed(point.x, 2)}" cy="${fixed(point.y, 2)}" r="2.5" fill="${profile.color}" opacity="0.72"/>`;
+          return `<circle cx="${fixed(point.x, 2)}" cy="${fixed(point.y, 2)}" r="2.1" fill="${profile.color}" opacity="0.72"/>`;
         }
-        const zeroStrokeWidth = isComparisonMode ? 1.4 : 2;
+        const zeroStrokeWidth = isComparisonMode ? 1.15 : 1.6;
         return `<polyline fill="none" stroke="${profile.color}" opacity="0.6" stroke-width="${zeroStrokeWidth}" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 5" points="${buildPointString(segment)}"/>`;
       })
       .join("");
@@ -3858,6 +4389,19 @@ function drawSectionChart(profiles, section, anchorSurveyId = state.surveyId) {
       updateSectionHoverFeedback(profiles, section, currentSurvey());
     }
   };
+  const openSnapshotFromPointer = (event) => {
+    const nextHoverDistance = chartHoverDistanceFromPointer(event, els.profileChart, activeProfiles, {
+      ...chartMetrics
+    });
+    if (nextHoverDistance === null) {
+      return;
+    }
+    state.sectionHoverDistance = nextHoverDistance;
+    drawSectionChart(profiles, section, anchorSurveyId);
+    renderSectionComparisonSummary(profiles, anchorSurveyId);
+    updateSectionHoverFeedback(profiles, section, currentSurvey());
+    openCurrentSectionComparisonSnapshot();
+  };
   const clearSectionHover = () => {
     if (state.sectionHoverDistance !== null) {
       state.sectionHoverDistance = null;
@@ -3893,6 +4437,9 @@ function drawSectionChart(profiles, section, anchorSurveyId = state.surveyId) {
     if (state.sectionPointerId === event.pointerId) {
       state.sectionPointerId = null;
     }
+    if (event.pointerType !== "mouse") {
+      openSnapshotFromPointer(event);
+    }
   };
   els.profileChart.onpointercancel = (event) => {
     els.profileChart.releasePointerCapture?.(event.pointerId);
@@ -3903,24 +4450,35 @@ function drawSectionChart(profiles, section, anchorSurveyId = state.surveyId) {
   els.profileChart.onmouseleave = () => {
     clearSectionHover();
   };
+  els.profileChart.onclick = (event) => {
+    openSnapshotFromPointer(event);
+  };
 }
 
-function drawSectionDifferenceInset(anchorProfile, comparisonProfile, centerDistance) {
+function drawSectionDifferenceInset(profiles, centerDistance) {
   const width = 380;
   const height = 150;
   const pad = { top: 16, right: 18, bottom: 30, left: 42 };
   const radius = 6;
+  const validProfiles = profiles.filter((profile) => profile?.rows?.length);
+  if (!validProfiles.length) {
+    els.sectionDifferenceInset.innerHTML = "";
+    return;
+  }
+  const allRows = validProfiles.flatMap((profile) => profile.rows);
   const minWindowX = Math.max(
-    Math.min(...anchorProfile.rows.map((row) => row.distance)),
+    Math.min(...allRows.map((row) => row.distance)),
     centerDistance - radius
   );
   const maxWindowX = Math.min(
-    Math.max(...anchorProfile.rows.map((row) => row.distance)),
+    Math.max(...allRows.map((row) => row.distance)),
     centerDistance + radius
   );
-  const anchorRows = sectionInsetWindowRows(anchorProfile.rows, centerDistance, radius);
-  const comparisonRows = sectionInsetWindowRows(comparisonProfile.rows, centerDistance, radius);
-  const combinedRows = [...anchorRows, ...comparisonRows].filter((row) => Number.isFinite(row.height));
+  const profileWindows = validProfiles.map((profile) => ({
+    ...profile,
+    windowRows: sectionInsetWindowRows(profile.rows, centerDistance, radius)
+  }));
+  const combinedRows = profileWindows.flatMap((profile) => profile.windowRows).filter((row) => Number.isFinite(row.height));
 
   if (!combinedRows.length) {
     els.sectionDifferenceInset.innerHTML = "";
@@ -3960,12 +4518,15 @@ function drawSectionDifferenceInset(anchorProfile, comparisonProfile, centerDist
     ${minY <= 0 && maxY >= 0 ? `<line x1="${pad.left}" y1="${fixed(baselineY, 2)}" x2="${width - pad.right}" y2="${fixed(baselineY, 2)}" stroke="rgba(255,255,255,0.16)" stroke-dasharray="4 4"/>` : ""}
   `;
 
+  const profileMarkup = profileWindows.map((profile) => (
+    `<polyline fill="none" stroke="${profile.color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" points="${pointString(profile.windowRows)}"/>`
+  )).join("");
+
   els.sectionDifferenceInset.innerHTML = `
     <rect x="0" y="0" width="${width}" height="${height}" rx="16" fill="transparent"/>
     ${xTickMarkup}
     ${axisMarkup}
-    <polyline fill="none" stroke="${anchorProfile.color}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" points="${pointString(anchorRows)}"/>
-    <polyline fill="none" stroke="${comparisonProfile.color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" points="${pointString(comparisonRows)}"/>
+    ${profileMarkup}
     <line x1="${fixed(cursorX, 2)}" y1="${pad.top}" x2="${fixed(cursorX, 2)}" y2="${height - pad.bottom}" stroke="rgba(247,104,139,0.32)" stroke-width="1.5" stroke-dasharray="5 5"/>
   `;
 }
@@ -4276,9 +4837,10 @@ function currentSurvey() {
 
 function weatherWindowForSurvey(surveys, surveyId) {
   const current = surveys.find((item) => item.id === surveyId) || surveys[0];
+  const anchor = current?.dateFrom || current?.dateTo || environmentalContext.fallbackSurveyEndDate;
   const end = current?.dateTo || current?.dateFrom || environmentalContext.fallbackSurveyEndDate;
   return {
-    start: subtractMonths(end, environmentalContext.weatherWindowMonths),
+    start: subtractMonths(anchor, environmentalContext.weatherWindowMonths),
     end
   };
 }
@@ -4958,7 +5520,30 @@ function preferredSecondarySurveyId() {
 }
 
 function defaultSectionComparisonSurveyIds() {
-  return Array.from(new Set([state.surveyId, preferredSecondarySurveyId()].filter(Boolean)));
+  const surveys = [...(currentProject()?.surveys || [])]
+    .sort((a, b) => String(a.dateFrom).localeCompare(String(b.dateFrom)));
+  const selectedIndex = surveys.findIndex((survey) => survey.id === state.surveyId);
+  if (selectedIndex === -1) {
+    return Array.from(new Set([state.surveyId, preferredSecondarySurveyId()].filter(Boolean)));
+  }
+
+  const previousIds = surveys
+    .slice(Math.max(0, selectedIndex - 2), selectedIndex)
+    .map((survey) => survey.id);
+
+  const selectedIds = [
+    ...previousIds,
+    surveys[selectedIndex].id
+  ];
+
+  if (selectedIds.length < 2) {
+    const fallbackId = preferredSecondarySurveyId();
+    if (fallbackId && !selectedIds.includes(fallbackId)) {
+      selectedIds.unshift(fallbackId);
+    }
+  }
+
+  return Array.from(new Set(selectedIds.filter(Boolean)));
 }
 
 function mergeSectionComparisonSurveyIds(preferred = [], existing = []) {
@@ -5825,11 +6410,11 @@ function sectionInsightCard({ eyebrow, title, summary, body }) {
   `;
 }
 
-function openSectionInsightOverlay(eyebrow, title, summary, body) {
+function openSectionInsightOverlay(eyebrow, title, summary, body, allowHtml = false) {
   els.sectionInsightOverlayEyebrow.textContent = eyebrow;
   els.sectionInsightOverlayTitle.textContent = title;
   els.sectionInsightOverlaySummary.textContent = summary;
-  els.sectionInsightOverlayBody.innerHTML = `<p>${escapeHtml(body)}</p>`;
+  els.sectionInsightOverlayBody.innerHTML = allowHtml ? body : `<p>${escapeHtml(body)}</p>`;
   els.sectionInsightOverlay.classList.remove("hidden");
   els.sectionInsightOverlay.setAttribute("aria-hidden", "false");
 }

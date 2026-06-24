@@ -387,7 +387,10 @@ async function handleAdminAuthRequest(request, response) {
 
 function writeManifest(manifestPath, projectId, surveyId, areaId, areaDir) {
   const expectedFiles = expectedSurveyFileNames();
-  const presentFiles = expectedFiles.filter((fileName) => fs.existsSync(path.join(areaDir, fileName)));
+  const presentFiles = expectedFiles.filter((fileName) => {
+    const candidates = assetCandidatesForManifest(areaId, fileName);
+    return candidates.some((candidate) => assetExistsForManifest(projectId, areaDir, areaId, fileName, candidate));
+  });
   const status = presentFiles.length === 0
     ? "pending-upload"
     : presentFiles.length === expectedFiles.length
@@ -410,6 +413,30 @@ function writeManifest(manifestPath, projectId, surveyId, areaId, areaDir) {
 
 function expectedSurveyFileNames() {
   return assetSettings.expectedSurveyAssets.map((item) => item.fileName);
+}
+
+function assetCandidatesForManifest(areaId, fileName) {
+  const configuredVariants = assetSettings.variants?.[fileName] || [];
+  const areaSpecificVariants = assetSettings.areaSpecificVariants?.[areaId]?.[fileName] || [];
+  return Array.from(new Set([
+    fileName,
+    ...configuredVariants.map((variant) => variant.replace("{areaId}", areaId)),
+    ...areaSpecificVariants
+  ]));
+}
+
+function assetExistsForManifest(projectId, areaDir, areaId, fileName, candidate) {
+  const surveyAssetPath = path.join(areaDir, candidate);
+  if (fs.existsSync(surveyAssetPath)) {
+    return true;
+  }
+  if (fileName === "section_lines.png") {
+    const sharedAssetPath = path.join(__dirname, assetSettings.sharedRoot, projectId, areaId, candidate);
+    if (fs.existsSync(sharedAssetPath)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function formatAssetFolder(projectId, surveyId) {

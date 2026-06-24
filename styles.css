@@ -1593,6 +1593,39 @@ textarea {
   background: #07111f;
 }
 
+.panorama-shell {
+  padding: 18px;
+  background:
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.14), transparent 24%),
+    linear-gradient(180deg, rgba(13, 24, 41, 0.96), rgba(8, 16, 29, 0.94));
+}
+
+.panorama-shell__intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.panorama-shell__stats {
+  align-self: stretch;
+}
+
+.panorama-frame-wrap {
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(7, 17, 31, 0.88);
+}
+
+.panorama-frame {
+  display: block;
+  width: 100%;
+  min-height: calc(100vh - 260px);
+  border: 0;
+  background: #07111f;
+}
+
 .shell-footer {
   display: flex;
   justify-content: space-between;
@@ -2428,7 +2461,7 @@ textarea {
 }
 
 .section-analysis-grid--with-comparison {
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
   align-items: stretch;
 }
 
@@ -2454,6 +2487,27 @@ textarea {
   margin-top: 2px;
   padding-top: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.section-comparison-quickbar {
+  display: none !important;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(16, 28, 48, 0.32);
+}
+
+.section-comparison-quickbar__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.section-comparison-quickbar__copy .eyebrow,
+.section-comparison-quickbar__copy .muted {
+  margin: 0;
 }
 
 .section-quick-inline {
@@ -2550,6 +2604,10 @@ textarea {
   font-size: 0.84rem;
 }
 
+.section-difference-card .muted:empty {
+  display: none;
+}
+
 .section-difference-card__value {
   margin: 0;
   font-size: clamp(1.8rem, 2.8vw, 2.5rem);
@@ -2559,13 +2617,97 @@ textarea {
   color: #eef4ff;
 }
 
+.section-difference-card__stack {
+  display: grid;
+  gap: 10px;
+}
+
+.section-difference-card__row {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.section-difference-card__row-label {
+  font-size: 0.76rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.section-difference-card__row .section-difference-card__value {
+  font-size: clamp(1.4rem, 2vw, 2rem);
+}
+
 .section-difference-card__text {
-  min-height: 2.4em;
+  min-height: 0;
+  color: #f7d88b;
+  line-height: 1.45;
 }
 
 .section-difference-inset {
   display: grid;
   gap: 8px;
+}
+
+.section-trend-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.section-trend-card--snapshot-source {
+  display: none;
+}
+
+.section-trend-card .eyebrow,
+.section-trend-card .muted {
+  margin: 0;
+}
+
+.section-trend-card .muted {
+  font-size: 0.84rem;
+}
+
+.section-trend-card__label {
+  margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #eef4ff;
+}
+
+.section-trend-mini {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  align-items: end;
+  min-height: 72px;
+  padding-top: 8px;
+}
+
+.section-trend-mini__step {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+}
+
+.section-trend-mini__bar {
+  width: 100%;
+  max-width: 40px;
+  min-height: 14px;
+  border-radius: 999px 999px 8px 8px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+.section-trend-mini__label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: center;
 }
 
 .section-difference-inset__header {
@@ -2712,6 +2854,30 @@ textarea {
 
 .section-insight-overlay__body p {
   margin: 0;
+}
+
+.section-snapshot-body {
+  display: grid;
+  gap: 16px;
+}
+
+.section-snapshot-localzoom {
+  display: grid;
+  gap: 10px;
+}
+
+.section-snapshot-localzoom strong {
+  display: block;
+}
+
+.section-snapshot-localzoom svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 18, 33, 0.52);
+  padding: 8px;
 }
 
 #sectionMetrics .card {
