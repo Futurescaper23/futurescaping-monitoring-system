@@ -52,11 +52,11 @@ export const projectConfig = {
         area1: "https://area-1-panos.netlify.app/",
         area2: "https://area-2-panos.netlify.app/",
         area3: "https://area-3-panos.netlify.app/",
-        area4: "",
-        area5: "",
-        area6: "",
-        area7: "",
-        area8: ""
+        area4: "https://area-4-panos.netlify.app/",
+        area5: "https://area-5-panos.netlify.app/",
+        area6: "https://area-6-panos.netlify.app/",
+        area7: "https://area-7-panos.netlify.app/",
+        area8: "https://area-8-panos.netlify.app/"
       }
     }
   },
