@@ -2346,6 +2346,10 @@ textarea {
   justify-items: end;
 }
 
+.shell[data-stage-visual="area-hero"] .shell-stagebar__bottom-dock {
+  bottom: 92px;
+}
+
 .shell[data-stage-visual="area-hero"] #shellStageSurvey,
 .shell[data-stage-visual="area-hero"] #shellStageArea {
   width: min(100%, 286px);
