@@ -13,7 +13,8 @@ export const projectConfig = {
         area4: "./assets/area-heroes/2026-06-16/area-4.png",
         area5: "./assets/area-heroes/2026-06-16/area-5.png",
         area6: "./assets/area-heroes/2026-06-16/area-6.png",
-        area7: "./assets/area-heroes/2026-06-16/area-7.png"
+        area7: "./assets/area-heroes/2026-06-16/area-7.png",
+        area8: "./assets/area-heroes/2026-06-16/area-8.png"
       },
       "2026-04-18": {
         area1: "./assets/area-heroes/2026-04-18/area1.png",
