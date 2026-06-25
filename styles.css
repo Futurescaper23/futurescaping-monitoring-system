@@ -2258,6 +2258,15 @@ textarea {
   background: linear-gradient(180deg, rgba(14, 29, 51, 0.9), rgba(11, 22, 39, 0.94));
 }
 
+.shell[data-stage-visual="area-hero"] .shell-stagebar__action {
+  position: absolute;
+  right: 34px;
+  bottom: 34px;
+  z-index: 2;
+  justify-items: end;
+  width: min(100%, 320px);
+}
+
 .shell[data-stage-visual="area-hero"][data-hero-area="area6"] .shell-stagebar__copy .muted {
   max-width: 24ch;
 }

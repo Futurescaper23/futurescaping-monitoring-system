@@ -1129,7 +1129,7 @@ async function renderShellStage() {
   const activeTabMeta = activeTabShellMeta();
   const shellRoot = document.querySelector(".shell");
   const overviewHeroTabs = new Set(["overview", "areas", "weather"]);
-  const stageSurvey = overviewHeroTabs.has(state.activeTab) ? latestSurvey(project) : survey;
+  const stageSurvey = survey;
   const areaHeroEnabled = AREA_ENABLED_TOOLBAR_TABS.has(state.activeTab);
   const configuredAreaHero = configuredAreaHeroImage(survey.id, area.id);
   const useOverviewHero = overviewHeroTabs.has(state.activeTab) || (!configuredAreaHero && areaHeroEnabled);
