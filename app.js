@@ -3809,6 +3809,14 @@ function normaliseSectionId(value) {
   return `A${Number(match[1])}-${match[2]}`;
 }
 
+function cleanCsvCell(value) {
+  const text = String(value ?? "").trim();
+  if (text.startsWith("\"") && text.endsWith("\"")) {
+    return text.slice(1, -1).replace(/""/g, "\"");
+  }
+  return text;
+}
+
 async function loadSectionRows(path, sectionId) {
     const response = await fetch(path);
     if (!response.ok) return [];
@@ -3822,7 +3830,7 @@ async function loadSectionRows(path, sectionId) {
     const heightIndex = headers.indexOf("height_m");
     const distanceIndex = headers.indexOf("distance_m") >= 0 ? headers.indexOf("distance_m") : headers.indexOf("discance_m");
     return lines.slice(1).map((line) => {
-      const columns = line.split(",");
+      const columns = line.split(",").map(cleanCsvCell);
       const currentSectionId = columns[sectionIndex] ?? columns[0];
       const label = columns[labelIndex] ?? columns[1];
       const sortOrder = columns[sortOrderIndex] ?? columns[2];
