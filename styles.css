@@ -96,14 +96,15 @@ body { overflow-x: hidden; }
   justify-items: start;
 }
 
-.shell[data-stage-visual="overview-hero"] .shell-stagebar__action,
-.shell[data-stage-visual="area-hero"] .shell-stagebar__action {
+.shell-stagebar__bottom-dock {
   position: absolute;
   right: 34px;
   bottom: 34px;
   z-index: 2;
+  width: min(100%, 420px);
+  display: grid;
   justify-items: end;
-  width: min(100%, 320px);
+  gap: 14px;
 }
 
 .shell-stagebar__brand {
@@ -2345,17 +2346,6 @@ textarea {
   justify-items: end;
 }
 
-.shell[data-stage-visual="area-hero"][data-hero-area="area1"] .shell-stagebar__summary-dock,
-.shell[data-stage-visual="area-hero"][data-hero-area="area3"] .shell-stagebar__summary-dock,
-.shell[data-stage-visual="area-hero"][data-hero-area="area4"] .shell-stagebar__summary-dock,
-.shell[data-stage-visual="area-hero"][data-hero-area="area7"] .shell-stagebar__summary-dock,
-.shell[data-stage-visual="area-hero"][data-hero-area="area8"] .shell-stagebar__summary-dock {
-  position: absolute;
-  right: 34px;
-  bottom: 34px;
-  z-index: 2;
-}
-
 .shell[data-stage-visual="area-hero"] #shellStageSurvey,
 .shell[data-stage-visual="area-hero"] #shellStageArea {
   width: min(100%, 286px);
@@ -3698,7 +3688,8 @@ a { color: var(--accent); }
 
   .shell[data-stage-visual="area-hero"] .shell-stagebar__copy,
   .shell[data-stage-visual="area-hero"] .shell-stagebar__meta,
-  .shell[data-stage-visual="area-hero"] .shell-stagebar__summary-dock {
+  .shell[data-stage-visual="area-hero"] .shell-stagebar__summary-dock,
+  .shell[data-stage-visual="area-hero"] .shell-stagebar__bottom-dock {
     position: relative;
     inset: auto;
     right: auto;
@@ -3743,7 +3734,9 @@ a { color: var(--accent); }
 
   .shell[data-stage-visual="area-hero"] #shellStageSurvey,
   .shell[data-stage-visual="area-hero"] #shellStageArea,
-  .shell[data-stage-visual="area-hero"] .shell-stagebar__summary-dock {
+  .shell[data-stage-visual="area-hero"] .shell-stagebar__summary-dock,
+  .shell[data-stage-visual="area-hero"] .shell-stagebar__bottom-dock,
+  .shell[data-stage-visual="area-hero"] .shell-stagebar__action {
     width: 100%;
     max-width: none;
   }
