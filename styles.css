@@ -96,6 +96,16 @@ body { overflow-x: hidden; }
   justify-items: start;
 }
 
+.shell[data-stage-visual="overview-hero"] .shell-stagebar__action,
+.shell[data-stage-visual="area-hero"] .shell-stagebar__action {
+  position: absolute;
+  right: 34px;
+  bottom: 34px;
+  z-index: 2;
+  justify-items: end;
+  width: min(100%, 320px);
+}
+
 .shell-stagebar__brand {
   display: none;
   align-items: center;
@@ -1533,7 +1543,7 @@ textarea {
 
 .survey-compare-grid {
   display: grid;
-  grid-template-columns: minmax(170px, 1.1fr) repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(170px, 1.1fr) repeat(3, minmax(0, 1fr));
   gap: 10px 16px;
   align-items: start;
 }
@@ -2256,15 +2266,6 @@ textarea {
 .shell[data-stage-visual="area-hero"] .shell-stage-action-link:hover,
 .shell[data-stage-visual="area-hero"] .shell-stage-action-link:focus-visible {
   background: linear-gradient(180deg, rgba(14, 29, 51, 0.9), rgba(11, 22, 39, 0.94));
-}
-
-.shell[data-stage-visual="area-hero"] .shell-stagebar__action {
-  position: absolute;
-  right: 34px;
-  bottom: 34px;
-  z-index: 2;
-  justify-items: end;
-  width: min(100%, 320px);
 }
 
 .shell[data-stage-visual="area-hero"][data-hero-area="area6"] .shell-stagebar__copy .muted {

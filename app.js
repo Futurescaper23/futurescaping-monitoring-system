@@ -2175,45 +2175,45 @@ function selectedDetailRow(label, value) {
   return `<div class="selected-detail-item"><span class="selected-detail-key">${escapeHtml(label)}</span><span class="selected-detail-value">${escapeHtml(value)}</span></div>`;
 }
 
-function surveyComparisonDetailRow(label, leftValue, rightValue) {
+function surveyComparisonDetailRow(label, values) {
   return `
     <div class="survey-compare-row">
       <span class="survey-compare-row__label">${escapeHtml(label)}</span>
-      <span class="survey-compare-row__value">${escapeHtml(leftValue)}</span>
-      <span class="survey-compare-row__value">${escapeHtml(rightValue)}</span>
+      ${values.map((value) => `<span class="survey-compare-row__value">${escapeHtml(value)}</span>`).join("")}
     </div>
   `;
 }
 
 function surveyComparisonMarkup(areaId) {
   const project = currentProject();
-  const activeSurvey = currentSurvey();
-  const comparisonSurvey = activeComparisonSurvey(project, activeSurvey)
-    || project.surveys.find((survey) => survey.id !== activeSurvey.id)
-    || activeSurvey;
-  const activeArea = effectiveAreaOverview(areaId, activeSurvey.id);
-  const comparisonArea = effectiveAreaOverview(areaId, comparisonSurvey.id);
-  const activeMidOffset = activeArea.midOffset ?? activeArea.midOffsetMinutes ?? 0;
-  const comparisonMidOffset = comparisonArea.midOffset ?? comparisonArea.midOffsetMinutes ?? 0;
+  const orderedSurveys = [...project.surveys].sort((left, right) => String(left.dateFrom || left.id).localeCompare(String(right.dateFrom || right.id)));
+  const surveyAreas = orderedSurveys.map((survey) => {
+    const overview = effectiveAreaOverview(areaId, survey.id);
+    return {
+      survey,
+      overview,
+      midOffset: overview.midOffset ?? overview.midOffsetMinutes ?? 0
+    };
+  });
+  const gridStyle = `grid-template-columns: minmax(170px, 1.1fr) repeat(${surveyAreas.length}, minmax(0, 1fr));`;
 
   return `
     <article class="selected-detail-panel selected-detail-panel--comparison">
       <div class="selected-detail-panel__intro">
         <h3>Survey-round comparison</h3>
-        <p class="selected-notes">This gives a quick same-area comparison between the two survey rounds, so you can see how the timing and tide window shifted without hopping between screens.</p>
+        <p class="selected-notes">This gives a quick same-area comparison across all saved survey rounds, so you can see how the timing and tide window shifted without hopping between screens.</p>
       </div>
-      <div class="survey-compare-grid">
+      <div class="survey-compare-grid" style="${escapeAttr(gridStyle)}">
         <div class="survey-compare-grid__head"></div>
-        <div class="survey-compare-grid__head">${escapeHtml(activeSurvey.shortDate)}</div>
-        <div class="survey-compare-grid__head">${escapeHtml(comparisonSurvey.shortDate)}</div>
-        ${surveyComparisonDetailRow("Survey day", activeArea.day, comparisonArea.day)}
-        ${surveyComparisonDetailRow("Flight window", `${activeArea.start}-${activeArea.finish}`, `${comparisonArea.start}-${comparisonArea.finish}`)}
-        ${surveyComparisonDetailRow("Actual duration", activeArea.actualDuration, comparisonArea.actualDuration)}
-        ${surveyComparisonDetailRow("Low tide reference", `${activeArea.lowTide} - ${activeArea.lowTideHeight}`, `${comparisonArea.lowTide} - ${comparisonArea.lowTideHeight}`)}
-        ${surveyComparisonDetailRow("Launch offset", activeArea.launchOffset, comparisonArea.launchOffset)}
-        ${surveyComparisonDetailRow("Mid-flight tide marker", midOffsetLabel(activeMidOffset), midOffsetLabel(comparisonMidOffset))}
-        ${surveyComparisonDetailRow("Tidal window", activeArea.tideWindow, comparisonArea.tideWindow)}
-        ${surveyComparisonDetailRow("Low-tide alignment", `${activeArea.tideScore}/100`, `${comparisonArea.tideScore}/100`)}
+        ${surveyAreas.map(({ survey }) => `<div class="survey-compare-grid__head">${escapeHtml(survey.shortDate || survey.label)}</div>`).join("")}
+        ${surveyComparisonDetailRow("Survey day", surveyAreas.map(({ overview }) => overview.day || "--"))}
+        ${surveyComparisonDetailRow("Flight window", surveyAreas.map(({ overview }) => `${overview.start || "--"}-${overview.finish || "--"}`))}
+        ${surveyComparisonDetailRow("Actual duration", surveyAreas.map(({ overview }) => overview.actualDuration || "--"))}
+        ${surveyComparisonDetailRow("Low tide reference", surveyAreas.map(({ overview }) => `${overview.lowTide || "--"} - ${overview.lowTideHeight || "--"}`))}
+        ${surveyComparisonDetailRow("Launch offset", surveyAreas.map(({ overview }) => overview.launchOffset || "--"))}
+        ${surveyComparisonDetailRow("Mid-flight tide marker", surveyAreas.map(({ midOffset }) => midOffsetLabel(midOffset)))}
+        ${surveyComparisonDetailRow("Tidal window", surveyAreas.map(({ overview }) => overview.tideWindow || "--"))}
+        ${surveyComparisonDetailRow("Low-tide alignment", surveyAreas.map(({ overview }) => `${overview.tideScore || "--"}/100`))}
       </div>
     </article>
   `;
