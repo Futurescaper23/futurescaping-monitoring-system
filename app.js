@@ -2754,7 +2754,15 @@ function renderWeather() {
 }
 
 function configuredPanoramaEmbed(surveyId, areaId) {
-  return projectConfig.branding?.panoramaEmbedsBySurvey?.[surveyId]?.[areaId] || "";
+  const embedsBySurvey = projectConfig.branding?.panoramaEmbedsBySurvey || {};
+  const directMatch = embedsBySurvey?.[surveyId]?.[areaId];
+  if (directMatch) {
+    return directMatch;
+  }
+  const fallbackMatch = Object.values(embedsBySurvey)
+    .map((areas) => areas?.[areaId] || "")
+    .find((value) => String(value || "").trim());
+  return fallbackMatch || "";
 }
 
 const PANORAMA_AREA_GUIDES = {
