@@ -119,6 +119,7 @@
             <h2 id="shellStageTitle">Loading view</h2>
             <p id="shellStageSummary" class="muted"></p>
           </div>
+          <div id="shellStageAction" class="shell-stagebar__action hidden" aria-hidden="true"></div>
         </div>
         <div id="shellStageVisual" class="shell-stagebar__visual" aria-hidden="true">
           <img id="shellStageVisualImage" class="shell-stagebar__image" src="./assets/overview-hero-estuary.png" alt="Project overview image">
@@ -647,6 +648,8 @@
           <a href="./privacy.html">Privacy Notice</a>
           <a href="./cookies.html">Cookie Notice</a>
           <a href="./contact.html">Contact</a>
+          <button id="openProjectLinkBtn" class="chip shell-footer__toggle" type="button">Open Live Project</button>
+          <button id="copyProjectLinkBtn" class="chip shell-footer__toggle" type="button">Copy Public Link</button>
           <button id="adminModeToggle" class="chip shell-footer__toggle hidden" type="button">Open Admin Console</button>
         </div>
       </footer>
@@ -1034,7 +1037,49 @@
 
 </script>
 
-    <script type='module' src='./app.js?v=20260611a'></script>
+    <script>
+      (function () {
+        const canonicalHref = document.querySelector("link[rel='canonical']")?.href || "https://future-monitoring-system.onrender.com/";
+        if (window.location.protocol !== "file:") {
+          const script = document.createElement("script");
+          script.type = "module";
+          script.src = "./app.js?v=20260625a";
+          document.body.appendChild(script);
+          return;
+        }
+
+        const escapedHref = canonicalHref
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+
+        document.body.innerHTML = `
+          <main style="min-height:100vh;display:grid;place-items:center;padding:32px;background:radial-gradient(circle at top, #203a63 0%, #0b172b 55%, #08111f 100%);color:#f3f7ff;font-family:Montserrat,Arial,sans-serif;">
+            <section style="width:min(720px,100%);padding:32px;border-radius:28px;border:1px solid rgba(126,192,255,0.22);background:rgba(13,24,42,0.92);box-shadow:0 24px 60px rgba(0,0,0,0.35);">
+              <p style="margin:0 0 12px;font-size:0.82rem;letter-spacing:0.22em;text-transform:uppercase;color:#7ec0ff;">FutureScaping Monitoring System</p>
+              <h1 style="margin:0 0 16px;font-size:clamp(2rem,5vw,3.5rem);line-height:0.95;">Open the hosted project, not the raw file copy</h1>
+              <p style="margin:0 0 14px;color:rgba(232,239,255,0.82);line-height:1.65;">This screen appeared because the project was opened from a local <code style="color:#9fd2ff;">file:///</code> path. The full monitoring system uses ES modules and needs either the hosted site or a local web server.</p>
+              <p style="margin:0 0 22px;color:rgba(232,239,255,0.82);line-height:1.65;">Use <strong>Open Live Project</strong> to view the working public version, or run <code style="color:#9fd2ff;">run-local.cmd</code> if you want to test it locally.</p>
+              <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+                <a href="${escapedHref}" style="display:inline-flex;align-items:center;justify-content:center;padding:14px 18px;border-radius:16px;background:linear-gradient(180deg,#58c8ff 0%,#2ca8f7 100%);color:#08213a;text-decoration:none;font-weight:800;">Open Live Project</a>
+                <button id="copyHostedLinkBtn" type="button" style="padding:14px 18px;border-radius:16px;border:1px solid rgba(126,192,255,0.26);background:rgba(17,33,58,0.88);color:#f3f7ff;font:inherit;font-weight:700;cursor:pointer;">Copy Public Link</button>
+              </div>
+              <p style="margin:0;color:rgba(191,206,233,0.76);font-size:0.95rem;">Public URL: <a href="${escapedHref}" style="color:#8fc9ff;">${escapedHref}</a></p>
+            </section>
+          </main>
+        `;
+
+        document.getElementById("copyHostedLinkBtn")?.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(canonicalHref);
+            document.getElementById("copyHostedLinkBtn").textContent = "Public Link Copied";
+          } catch (error) {
+            window.prompt("Copy this public project link:", canonicalHref);
+          }
+        });
+      }());
+    </script>
   </body>
 </html>
 

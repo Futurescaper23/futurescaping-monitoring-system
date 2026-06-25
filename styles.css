@@ -91,6 +91,11 @@ body { overflow-x: hidden; }
   align-content: start;
 }
 
+.shell-stagebar__action {
+  display: grid;
+  justify-items: start;
+}
+
 .shell-stagebar__brand {
   display: none;
   align-items: center;
@@ -122,6 +127,51 @@ body { overflow-x: hidden; }
   max-width: 24ch;
   font-size: 1.05rem;
   color: rgba(221, 232, 250, 0.86);
+}
+
+.shell-stage-action-link {
+  width: min(100%, 360px);
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(126, 192, 255, 0.28);
+  background: linear-gradient(180deg, rgba(30, 126, 255, 0.22), rgba(15, 73, 163, 0.24));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 18px 36px rgba(0, 0, 0, 0.22);
+  color: #f3f8ff;
+  text-decoration: none;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.shell-stage-action-link:hover,
+.shell-stage-action-link:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(168, 214, 255, 0.46);
+  background: linear-gradient(180deg, rgba(38, 141, 255, 0.28), rgba(15, 73, 163, 0.3));
+}
+
+.shell-stage-action-link__label {
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.shell-stage-action-link__sub {
+  color: rgba(224, 234, 250, 0.82);
+  line-height: 1.45;
+}
+
+.shell-stage-action-link--disabled {
+  border-style: dashed;
+  background: rgba(14, 27, 49, 0.54);
+  color: rgba(243, 248, 255, 0.9);
+  cursor: default;
 }
 
 .shell-stagebar__meta {
@@ -2195,6 +2245,17 @@ textarea {
   max-width: 33ch;
   font-size: 0.94rem;
   color: rgba(224, 234, 250, 0.84);
+}
+
+.shell[data-stage-visual="area-hero"] .shell-stage-action-link {
+  width: min(100%, 320px);
+  padding: 12px 14px;
+  background: linear-gradient(180deg, rgba(10, 21, 38, 0.82), rgba(9, 19, 34, 0.88));
+}
+
+.shell[data-stage-visual="area-hero"] .shell-stage-action-link:hover,
+.shell[data-stage-visual="area-hero"] .shell-stage-action-link:focus-visible {
+  background: linear-gradient(180deg, rgba(14, 29, 51, 0.9), rgba(11, 22, 39, 0.94));
 }
 
 .shell[data-stage-visual="area-hero"][data-hero-area="area6"] .shell-stagebar__copy .muted {

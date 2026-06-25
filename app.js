@@ -71,6 +71,7 @@ import { volumeChangeSettings } from "./src/data/volumeChange.js?v=20260529g";
 
 const VALID_TABS = new Set(projectConfig.navigation.tabs);
 const AREA_ENABLED_TOOLBAR_TABS = new Set(["panorama", "volume", "layers", "sections"]);
+const SURVEY_MODEL_TABS = new Set(["areas", "panorama", "volume", "layers", "sections"]);
 
   const EXPLICIT_SECTION_IMAGE_TRACKS = {
     area1: [
@@ -383,6 +384,7 @@ const els = {
   shellStageEyebrow: byId("shellStageEyebrow"),
   shellStageTitle: byId("shellStageTitle"),
   shellStageSummary: byId("shellStageSummary"),
+  shellStageAction: byId("shellStageAction"),
   shellStageSummaryDock: byId("shellStageSummaryDock"),
   shellStageSurvey: byId("shellStageSurvey"),
   shellStageArea: byId("shellStageArea"),
@@ -576,6 +578,8 @@ const els = {
   workflowGrid: byId("workflowGrid"),
   tabs: byId("tabs"),
   backToTopBtn: byId("backToTopBtn"),
+  openProjectLinkBtn: byId("openProjectLinkBtn"),
+  copyProjectLinkBtn: byId("copyProjectLinkBtn"),
   adminModeToggle: byId("adminModeToggle")
 };
 
@@ -681,6 +685,22 @@ function syncUrlState() {
   window.history.replaceState(null, "", nextUrl);
 }
 
+function publicProjectUrl() {
+  const canonicalHref = document.querySelector("link[rel='canonical']")?.href;
+  const configuredBase = projectConfig.deployment?.publicBaseUrl || canonicalHref || window.location.href;
+  const shareUrl = new URL(configuredBase, window.location.href);
+  shareUrl.search = "";
+  shareUrl.hash = "";
+  shareUrl.searchParams.set("tab", state.activeTab);
+  shareUrl.searchParams.set("survey", state.surveyId);
+  shareUrl.searchParams.set("area", state.areaId);
+  shareUrl.searchParams.set("section", state.sectionId);
+  if (state.activeTab === "overview" && state.overviewMode !== "information") {
+    shareUrl.searchParams.set("mode", state.overviewMode);
+  }
+  return shareUrl.toString();
+}
+
 function normaliseAreaId(value) {
   const text = String(value || "").trim();
   const match = text.match(/^(?:area|a)?(\d+)$/i);
@@ -691,6 +711,29 @@ function normaliseAreaId(value) {
 }
 
 function bindEvents() {
+  els.openProjectLinkBtn?.addEventListener("click", () => {
+    window.open(publicProjectUrl(), "_blank", "noopener,noreferrer");
+  });
+
+  els.copyProjectLinkBtn?.addEventListener("click", async () => {
+    const shareUrl = publicProjectUrl();
+    const defaultLabel = "Copy Public Link";
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard API unavailable");
+      }
+      await navigator.clipboard.writeText(shareUrl);
+      els.copyProjectLinkBtn.textContent = "Public Link Copied";
+      window.setTimeout(() => {
+        if (els.copyProjectLinkBtn) {
+          els.copyProjectLinkBtn.textContent = defaultLabel;
+        }
+      }, 1800);
+    } catch (error) {
+      window.prompt("Copy this public project link:", shareUrl);
+    }
+  });
+
   els.surveySelect.addEventListener("change", () => {
     state.surveyId = els.surveySelect.value;
     state.primarySurveyId = state.surveyId;
@@ -1127,6 +1170,7 @@ async function renderShellStage() {
   els.shellStageEyebrow.textContent = activeTabMeta.eyebrow;
   els.shellStageTitle.textContent = activeTabMeta.title;
   els.shellStageSummary.textContent = activeTabMeta.summary;
+  renderShellStageAction(stageSurvey);
   const useSummaryDock = ["volume", "layers", "sections"].includes(state.activeTab) && ["area1", "area3", "area4", "area7", "area8"].includes(area.id);
   if (els.shellStageSummaryDock) {
     els.shellStageSummaryDock.textContent = activeTabMeta.summary;
@@ -1187,6 +1231,46 @@ function configuredOverviewHeroImage(surveyId) {
   return projectConfig.branding?.overviewHeroImagePathBySurvey?.[surveyId]
     || projectConfig.branding?.overviewHeroImagePath
     || "";
+}
+
+function configuredSurveyModelUrl(surveyId) {
+  return String(projectConfig.branding?.niraModelsBySurvey?.[surveyId] || "").trim();
+}
+
+function renderShellStageAction(survey) {
+  if (!els.shellStageAction) {
+    return;
+  }
+  const shouldShowAction = SURVEY_MODEL_TABS.has(state.activeTab);
+  const modelUrl = configuredSurveyModelUrl(survey?.id);
+  if (!shouldShowAction) {
+    els.shellStageAction.innerHTML = "";
+    els.shellStageAction.classList.add("hidden");
+    els.shellStageAction.setAttribute("aria-hidden", "true");
+    return;
+  }
+  if (modelUrl) {
+    els.shellStageAction.innerHTML = `
+      <a
+        class="shell-stage-action-link"
+        href="${escapeAttr(modelUrl)}"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <span class="shell-stage-action-link__label">Open 3D Model</span>
+        <span class="shell-stage-action-link__sub">${escapeHtml(`Open the DJI Terra model for ${survey.shortDate || survey.label} in Nira.`)}</span>
+      </a>
+    `;
+  } else {
+    els.shellStageAction.innerHTML = `
+      <div class="shell-stage-action-link shell-stage-action-link--disabled" aria-disabled="true">
+        <span class="shell-stage-action-link__label">3D Model Coming Soon</span>
+        <span class="shell-stage-action-link__sub">${escapeHtml(`Add the Nira link for ${survey.shortDate || survey.label} in project config to enable this button.`)}</span>
+      </div>
+    `;
+  }
+  els.shellStageAction.classList.remove("hidden");
+  els.shellStageAction.setAttribute("aria-hidden", "false");
 }
 
 function activeTabShellMeta() {

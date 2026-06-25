@@ -58,10 +58,18 @@ export const projectConfig = {
         area7: "https://area-7-panos.netlify.app/",
         area8: "https://area-8-panos.netlify.app/"
       }
+    },
+    niraModelsBySurvey: {
+      "2026-03-22": "https://futurescaping.nira.app/a/35VOk9gRT5KFNQDIq54mSQ/1",
+      "2026-04-18": "https://futurescaping.nira.app/a/ZBURz7G_T8m2DdXuev7yiw/1",
+      "2026-06-16": "https://futurescaping.nira.app/a/Z8GYJffuRYaeoQVq1w6dUw/1"
     }
   },
   data: {
     projectsPath: "./data/projects.json"
+  },
+  deployment: {
+    publicBaseUrl: "https://future-monitoring-system.onrender.com/"
   },
   defaultState: {
     areaId: "area1",
