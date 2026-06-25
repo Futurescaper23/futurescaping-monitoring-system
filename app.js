@@ -3286,11 +3286,11 @@ async function renderVolume() {
   const viewerStats = areaDataset?.viewerStats || null;
   const viewerGuideTitle = areaDataset?.viewerGuideTitle || "How to read this viewer";
   const viewerGuideWhatIs = areaDataset?.viewerGuideWhatIs
-    || "This interactive model compares the same measured area across two survey dates using point-cloud-derived terrain data and a shared comparison footprint.";
+    || "This model lets you look at the same part of the beach in 3D and see where the later survey looks higher or lower than the earlier one. Use it as a visual check alongside the simple figures and maps below.";
   const viewerGuideColours = areaDataset?.viewerGuideColours
-    || "The coloured overlay highlights where the later survey appears higher or lower than the earlier one. Read it as relative gain and loss across the compared surface, then cross-check the summary figures and flat reference maps below.";
+    || "Show base terrain turns the latest beach surface on or off. With it on, you can see the actual shape of the most recent scan underneath the colours. With it off, the change colours are easier to read on their own. Bigger point size makes the surface look fuller and easier to see. Smaller point size makes it look finer and lighter.";
   const viewerGuideUse = areaDataset?.viewerGuideUse
-    || "Drag to orbit, scroll to zoom, and click points to inspect local height or change values. Use the controls on the right to simplify the display if you want a cleaner read.";
+    || "Start by turning the model around and zooming into the area you care about. If the view feels too busy, switch off Show base terrain to focus on the colour change only. If the model looks too thin or patchy, increase point size. If it looks too chunky, reduce point size for a cleaner look.";
 
   const [baselineImageSrc, currentImageSrc, previewImageSrc, previewBaselineImageSrc, previewCurrentImageSrc] = await Promise.all([
     baselineSurvey ? resolveExistingAsset(surveyAssetCandidates(project.id, baselineSurvey.id, sandboxArea.id, "ortho.jpg")) : Promise.resolve(""),
