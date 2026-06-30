@@ -3412,11 +3412,7 @@ async function renderVolume() {
     const pairSummaries = trendPairSummaries(data.stats);
     const topClass = sortedTrendClasses(data.stats.trend_classes || [])[0] || null;
     els.volumeTrendBody.innerHTML = `
-      <div class="volume-trend-stage">
-        <figure class="volume-trend-map volume-trend-map--wide">
-          <img src="${escapeAttr(data.imageSrc)}" alt="Trend classification map for Area 3 across all three survey rounds">
-          <figcaption class="muted">Use this map as the long-term view. The 3D viewer shows one comparison at a time, while this shows the wider three-round pattern in one place.</figcaption>
-        </figure>
+      <div class="volume-trend-top">
         <div class="volume-trend-callout">
           <div class="volume-trend-callout__head">
             <div>
@@ -3427,31 +3423,37 @@ async function renderVolume() {
           </div>
           <p>${escapeHtml(trendHeadline(topClass))}</p>
         </div>
+        <div class="volume-trend-pairs">
+          ${pairSummaries.map((item) => `
+            <article class="volume-trend-pair-card">
+              <p class="eyebrow">${escapeHtml(item.label)}</p>
+              <h3>${escapeHtml(item.readoutTitle)}</h3>
+              <p>${escapeHtml(item.readoutCopy)}</p>
+              <div class="volume-card__grid">
+                <div class="volume-mini volume-mini--gain">
+                  <span class="muted">Material added</span>
+                  <strong>${escapeHtml(formatVolume(item.added))}</strong>
+                </div>
+                <div class="volume-mini volume-mini--loss">
+                  <span class="muted">Material removed</span>
+                  <strong>${escapeHtml(formatVolume(item.removed))}</strong>
+                </div>
+                <div class="volume-mini volume-mini--net">
+                  <span class="muted">Overall balance</span>
+                  <strong>${escapeHtml(formatVolume(item.net))}</strong>
+                </div>
+              </div>
+              <p class="muted">${escapeHtml(item.supportingCopy)}</p>
+            </article>
+          `).join("")}
+        </div>
       </div>
-      <div class="volume-trend-pairs">
-        ${pairSummaries.map((item) => `
-          <article class="volume-trend-pair-card">
-            <p class="eyebrow">${escapeHtml(item.label)}</p>
-            <h3>${escapeHtml(item.readoutTitle)}</h3>
-            <p>${escapeHtml(item.readoutCopy)}</p>
-            <div class="volume-card__grid">
-              <div class="volume-mini volume-mini--gain">
-                <span class="muted">Material added</span>
-                <strong>${escapeHtml(formatVolume(item.added))}</strong>
-              </div>
-              <div class="volume-mini volume-mini--loss">
-                <span class="muted">Material removed</span>
-                <strong>${escapeHtml(formatVolume(item.removed))}</strong>
-              </div>
-              <div class="volume-mini volume-mini--net">
-                <span class="muted">Overall balance</span>
-                <strong>${escapeHtml(formatVolume(item.net))}</strong>
-              </div>
-            </div>
-            <p class="muted">${escapeHtml(item.supportingCopy)}</p>
-          </article>
-        `).join("")}
-      </div>
+      <figure class="volume-trend-map volume-trend-map--rotated">
+        <div class="volume-trend-map__stage">
+          <img src="${escapeAttr(data.imageSrc)}" alt="Trend classification map for Area 3 across all three survey rounds">
+        </div>
+        <figcaption class="muted">Use this map as the long-term view. The 3D viewer shows one comparison at a time, while this shows the wider three-round pattern in one place.</figcaption>
+      </figure>
       <div class="volume-trend-classes">
         ${sortedTrendClasses(data.stats.trend_classes || []).map((item) => `
           <article class="volume-trend-class-card">

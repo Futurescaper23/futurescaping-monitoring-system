@@ -3278,7 +3278,7 @@ textarea {
   background: linear-gradient(180deg, rgba(77, 112, 166, 0.22), rgba(39, 60, 96, 0.3));
 }
 
-.volume-trend-stage {
+.volume-trend-top {
   display: grid;
   gap: 16px;
 }
@@ -3294,21 +3294,35 @@ textarea {
   background: linear-gradient(180deg, rgba(77, 112, 166, 0.22), rgba(39, 60, 96, 0.3));
 }
 
-.volume-trend-map img {
-  width: 100%;
-  display: block;
+.volume-trend-map {
+  padding: 14px 14px 12px;
+}
+
+.volume-trend-map__stage {
+  min-height: 400px;
+  display: grid;
+  place-items: center;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(7, 17, 31, 0.88);
+  overflow: hidden;
 }
 
-.volume-trend-map--wide img {
-  max-height: 420px;
-  object-fit: contain;
+.volume-trend-map img {
+  display: block;
+}
+
+.volume-trend-map--rotated img {
+  width: auto;
+  max-width: none;
+  height: min(78vw, 680px);
+  max-height: none;
+  transform: rotate(90deg);
+  transform-origin: center;
 }
 
 .volume-trend-map figcaption {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .volume-trend-summary {
@@ -3348,8 +3362,8 @@ textarea {
 .volume-trend-pairs,
 .volume-trend-classes {
   display: grid;
-  gap: 16px;
-  margin-top: 18px;
+  gap: 12px;
+  margin-top: 14px;
 }
 
 .volume-trend-pairs {
@@ -3362,29 +3376,39 @@ textarea {
 
 .volume-trend-pair-card h3 {
   margin: 6px 0 10px;
+  font-size: 1rem;
 }
 
 .volume-trend-pair-card > p {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
 }
 
 .volume-trend-pair-card .volume-card__grid {
-  margin: 10px 0;
+  margin: 8px 0;
+  gap: 8px;
 }
 
 .volume-trend-class-card__head {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .volume-trend-class-card {
-  padding: 14px 16px;
+  padding: 12px 14px;
 }
 
 .volume-trend-class-card p {
   margin: 0;
+}
+
+.volume-trend-class-card strong {
+  font-size: 0.95rem;
+}
+
+.volume-trend-classes {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .volume-trend-swatch {
@@ -3497,6 +3521,14 @@ textarea {
     text-align: left;
   }
 
+  .volume-trend-map__stage {
+    min-height: 320px;
+  }
+
+  .volume-trend-map--rotated img {
+    height: min(90vw, 560px);
+  }
+
   .volume-viewer-stage,
   .volume-viewer-frame {
     min-height: 620px;
@@ -3510,6 +3542,14 @@ textarea {
 
   .volume-trend-map--wide img {
     max-height: 300px;
+  }
+
+  .volume-trend-map__stage {
+    min-height: 260px;
+  }
+
+  .volume-trend-map--rotated img {
+    height: min(110vw, 420px);
   }
 
   .volume-viewer-stage,
