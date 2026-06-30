@@ -587,8 +587,6 @@ const els = {
   workflowGrid: byId("workflowGrid"),
   tabs: byId("tabs"),
   backToTopBtn: byId("backToTopBtn"),
-  openProjectLinkBtn: byId("openProjectLinkBtn"),
-  copyProjectLinkBtn: byId("copyProjectLinkBtn"),
   adminModeToggle: byId("adminModeToggle")
 };
 
@@ -720,29 +718,6 @@ function normaliseAreaId(value) {
 }
 
 function bindEvents() {
-  els.openProjectLinkBtn?.addEventListener("click", () => {
-    window.open(publicProjectUrl(), "_blank", "noopener,noreferrer");
-  });
-
-  els.copyProjectLinkBtn?.addEventListener("click", async () => {
-    const shareUrl = publicProjectUrl();
-    const defaultLabel = "Copy Public Link";
-    try {
-      if (!navigator.clipboard?.writeText) {
-        throw new Error("Clipboard API unavailable");
-      }
-      await navigator.clipboard.writeText(shareUrl);
-      els.copyProjectLinkBtn.textContent = "Public Link Copied";
-      window.setTimeout(() => {
-        if (els.copyProjectLinkBtn) {
-          els.copyProjectLinkBtn.textContent = defaultLabel;
-        }
-      }, 1800);
-    } catch (error) {
-      window.prompt("Copy this public project link:", shareUrl);
-    }
-  });
-
   els.surveySelect.addEventListener("change", () => {
     state.surveyId = els.surveySelect.value;
     state.primarySurveyId = state.surveyId;
