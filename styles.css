@@ -3301,8 +3301,7 @@ textarea {
 .volume-trend-map__stage {
   min-height: 0;
   aspect-ratio: 2.35 / 1;
-  display: grid;
-  place-items: center;
+  position: relative;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(7, 17, 31, 0.88);
@@ -3314,11 +3313,14 @@ textarea {
 }
 
 .volume-trend-map--rotated img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
   width: auto;
-  height: 84%;
+  height: 82%;
   max-width: none;
   max-height: none;
-  transform: rotate(90deg);
+  transform: translate(-50%, -50%) rotate(90deg);
   transform-origin: center;
 }
 
@@ -3527,7 +3529,7 @@ textarea {
   }
 
   .volume-trend-map--rotated img {
-    height: 82%;
+    height: 80%;
   }
 
   .volume-viewer-stage,
@@ -3546,7 +3548,7 @@ textarea {
   }
 
   .volume-trend-map--rotated img {
-    height: 78%;
+    height: 76%;
   }
 
   .volume-viewer-stage,
