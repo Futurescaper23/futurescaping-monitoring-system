@@ -3638,105 +3638,43 @@ async function renderVolume() {
   els.volumeMethod.innerHTML = `
     <div class="volume-explainer">
       <div class="volume-explainer__block">
-        <strong>Compared surveys</strong>
-        <p>${escapeHtml(`${baselineLabel} compared with ${survey.label}.`)}</p>
+        <strong>What this page is doing now</strong>
+        <p>This page now combines three layers of evidence for ${escapeHtml(area.label)}: the interactive 3D comparison viewer, the longer-term trend map across all three survey rounds, and the flat reference maps underneath.</p>
       </div>
       <div class="volume-explainer__block">
-        <strong>How this was worked out</strong>
-        <p>We compared the earlier and later ground surfaces inside the same fixed sandbar outline, then totalled where material appears to have been added and where it appears to have been removed.</p>
+        <strong>How to read it in order</strong>
+        <p>Start with the 3D viewer for detailed shape change, use the trend panel to see whether movement is repeating or reversing across the full survey set, then use the reference maps for a simpler plan-view check.</p>
       </div>
       <div class="volume-explainer__block">
-        <strong>How to read the figures</strong>
-        <p>Material added means more sand or sediment appears to be present in the later survey. Material removed means less appears to be present. Overall balance is the difference between the two.</p>
+        <strong>How the trend layer is built</strong>
+        <p>The trend panel is not just one before-and-after comparison. It looks across Survey 1, Survey 2, and Survey 3 together so we can separate steady build-up, steady lowering, and areas that changed direction over time.</p>
       </div>
       ${volumeLegendMarkup}
       <div class="volume-explainer__block">
-        <strong>Area note</strong>
+        <strong>Current area note</strong>
         <p>${escapeHtml(areaDataset?.notes || "Add a short plain-English note here to explain what changed in this part of the estuary.")}</p>
       </div>
     </div>
   `;
 
-  els.volumeNarrative.innerHTML = hasConfiguredRows
-    ? `
-      <div class="volume-explainer">
-        <div class="volume-explainer__block">
-          <strong>What this preview is showing</strong>
-          <p>This first live trial combines the measured volume totals with a hosted 3D scene and plan-view maps, so people can move between overall numbers, interactive terrain context, and simple classification imagery.</p>
-        </div>
-        <div class="volume-explainer__block">
-          <strong>Plain-English readout</strong>
-          <p>${totals.net >= 0
-            ? `Overall, the monitored sandbar appears to have gained material between ${baselineSurvey?.shortDate || baselineLabel} and ${survey.shortDate}.`
-            : `Overall, the monitored sandbar appears to have lost material between ${baselineSurvey?.shortDate || baselineLabel} and ${survey.shortDate}.`}</p>
-        </div>
-        <div class="volume-explainer__block">
-          <strong>Review confidence</strong>
-          <p>${escapeHtml(polygons.map((item) => `${item.label}: ${item.confidence || volumeChangeSettings.defaultConfidence}`).join(" | "))}</p>
-        </div>
+  els.volumeNarrative.innerHTML = `
+    <div class="volume-explainer">
+      <div class="volume-explainer__block">
+        <strong>What is live right now</strong>
+        <p>The current live setup is strongest for Area 3 because that is where the three-round trend outputs, the hosted 3D viewer, and the first downloaded reference-map pair have all been lined up together.</p>
       </div>
-    `
-    : `
-      <div class="volume-explainer">
-        <div class="volume-explainer__block">
-          <strong>Testing status</strong>
-          <p>${escapeHtml(`${area.label} is ready for the workflow, but this page is still waiting for its first finished preview map and measured sandbar figures.`)}</p>
-        </div>
-        <div class="volume-explainer__block">
-          <strong>What to look at instead</strong>
-          <p>${escapeHtml(`${sandboxArea.label} currently shows the first live preview of how this page will work once the measured outputs are in place.`)}</p>
-        </div>
-        <div class="volume-explainer__block">
-          <strong>Next step</strong>
-          <p>${escapeHtml(polygons.length
-            ? "Add the preview image and the measured added, removed, and overall balance values for this area."
-            : "Add the shared sandbar polygons first, then add the preview image and measured values for this area.")}</p>
-        </div>
+      <div class="volume-explainer__block">
+        <strong>What the client should take from it</strong>
+        <p>The top half of the page explains where the estuary appears to be repeatedly building up, repeatedly lowering, or changing direction between rounds. The lower reference maps then give a simpler flat-view explanation for the first comparison pair.</p>
       </div>
-    `;
+      <div class="volume-explainer__block">
+        <strong>What comes next</strong>
+        <p>Survey 1 vs Survey 3 and Survey 2 vs Survey 3 can now be added into the same structure as soon as their matching reference maps are exported, without changing the layout again.</p>
+      </div>
+    </div>
+  `;
 
-  els.volumeAreaGrid.innerHTML = hasConfiguredRows
-    ? polygons.map((item) => `
-      <article class="card volume-breakdown-card">
-        <div class="volume-card__meta">
-          <div>
-            <p class="muted">${escapeHtml(area.overviewCode)} - ${escapeHtml(item.id || "")}</p>
-            <h3>${escapeHtml(item.label)}</h3>
-          </div>
-          <span class="chip volume-confidence-chip">${escapeHtml(item.confidence || volumeChangeSettings.defaultConfidence)}</span>
-        </div>
-        <div class="volume-card__grid">
-          <div class="volume-mini volume-mini--gain">
-            <span class="muted">Material added</span>
-            <strong>${escapeHtml(formatVolume(item.gainM3))}</strong>
-          </div>
-          <div class="volume-mini volume-mini--loss">
-            <span class="muted">Material removed</span>
-            <strong>${escapeHtml(formatVolume(item.lossM3))}</strong>
-          </div>
-          <div class="volume-mini volume-mini--net">
-            <span class="muted">Overall balance</span>
-            <strong>${escapeHtml(formatVolume(item.netM3))}</strong>
-          </div>
-        </div>
-        <p>${escapeHtml(item.summary || "No plain-English summary added yet.")}</p>
-      </article>
-    `).join("")
-    : polygons.length
-      ? polygons.map((item) => `
-        <article class="card">
-          <p class="muted">${escapeHtml(area.overviewCode)} - ${escapeHtml(item.id || "")}</p>
-          <h3>${escapeHtml(item.label)}</h3>
-          <p>${escapeHtml(item.notes || "Fixed monitoring polygon loaded and ready for cubic metre reporting.")}</p>
-        </article>
-      `).join("")
-      : `
-        <article class="card">
-          <p class="muted">${escapeHtml(area.overviewCode)} - ${escapeHtml(area.label)}</p>
-          <h3>Ready for sandbar results</h3>
-          <p>This survey pair is set up for sandbar change reporting. Add the per-sandbar cubic metre rows in admin when the QGIS calculation is complete.</p>
-        </article>
-      `;
+  els.volumeAreaGrid.innerHTML = comparisonReadinessCards(trendData, area.label);
 }
 
 async function renderAdmin() {
@@ -5213,6 +5151,46 @@ function renderVolumeReferenceSelector(activeKey = "ab", availableKeys = []) {
       </span>
     `;
   }).join("");
+}
+
+function comparisonReadinessCards(trendData, areaLabel) {
+  const pairSummaries = trendData ? trendPairSummaries(trendData.stats) : [];
+  const rollout = [
+    {
+      key: "ab",
+      label: "Survey 1 vs Survey 2",
+      status: "Live now",
+      detail: "3D viewer, trend summary, and reference maps are all in place for this first comparison pair.",
+      note: pairSummaries[0]?.supportingCopy || "Reference maps loaded."
+    },
+    {
+      key: "ac",
+      label: "Survey 1 vs Survey 3",
+      status: "Comparison ready",
+      detail: `The longer-gap comparison is already summarised in the trend analysis above. The dedicated flat reference maps for ${areaLabel} can slot in here next.`,
+      note: pairSummaries[1]?.supportingCopy || "Waiting for reference maps."
+    },
+    {
+      key: "bc",
+      label: "Survey 2 vs Survey 3",
+      status: "Comparison ready",
+      detail: `The short late-season comparison is also summarised above. The matching plan-view reference maps for ${areaLabel} can be added here as soon as they are exported.`,
+      note: pairSummaries[2]?.supportingCopy || "Waiting for reference maps."
+    }
+  ];
+  return rollout.map((item) => `
+    <article class="card volume-breakdown-card">
+      <div class="volume-card__meta">
+        <div>
+          <p class="muted">${escapeHtml(areaLabel)}</p>
+          <h3>${escapeHtml(item.label)}</h3>
+        </div>
+        <span class="chip volume-confidence-chip">${escapeHtml(item.status)}</span>
+      </div>
+      <p>${escapeHtml(item.detail)}</p>
+      <p class="muted">${escapeHtml(item.note)}</p>
+    </article>
+  `).join("");
 }
 
 function sortedTrendClasses(items) {
