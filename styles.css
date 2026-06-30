@@ -3314,11 +3314,11 @@ textarea {
 }
 
 .volume-trend-map--rotated img {
-  width: 88%;
+  width: auto;
+  height: 84%;
   max-width: none;
-  height: auto;
   max-height: none;
-  transform: rotate(90deg) scale(1.22);
+  transform: rotate(90deg);
   transform-origin: center;
 }
 
@@ -3527,8 +3527,7 @@ textarea {
   }
 
   .volume-trend-map--rotated img {
-    width: 92%;
-    transform: rotate(90deg) scale(1.18);
+    height: 82%;
   }
 
   .volume-viewer-stage,
@@ -3547,8 +3546,7 @@ textarea {
   }
 
   .volume-trend-map--rotated img {
-    width: 96%;
-    transform: rotate(90deg) scale(1.08);
+    height: 78%;
   }
 
   .volume-viewer-stage,
