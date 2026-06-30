@@ -3215,6 +3215,20 @@ textarea {
   opacity: 0.72;
 }
 
+.volume-rollout-status {
+  display: inline-flex;
+  margin: 0 0 10px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(85, 200, 255, 0.12);
+  border: 1px solid rgba(85, 200, 255, 0.18);
+  color: #d7efff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .volume-viewer-layout {
   display: block;
 }

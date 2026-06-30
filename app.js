@@ -3337,20 +3337,6 @@ async function renderVolume() {
     return acc;
   }, { gain: 0, loss: 0, net: 0 });
 
-  const volumeLegendMarkup = `
-    <div class="volume-explainer__block">
-      <strong>Change colour key</strong>
-      <div class="volume-change-key">
-        <span class="volume-change-key__item"><span class="volume-change-key__swatch volume-change-key__swatch--red"></span><span>&lt; -0.20 m</span></span>
-        <span class="volume-change-key__item"><span class="volume-change-key__swatch volume-change-key__swatch--orange"></span><span>-0.20 to -0.05 m</span></span>
-        <span class="volume-change-key__item"><span class="volume-change-key__swatch volume-change-key__swatch--yellow"></span><span>-0.05 to 0.05 m</span></span>
-        <span class="volume-change-key__item"><span class="volume-change-key__swatch volume-change-key__swatch--green"></span><span>0.05 to 0.20 m</span></span>
-        <span class="volume-change-key__item"><span class="volume-change-key__swatch volume-change-key__swatch--blue"></span><span>&gt; 0.20 m</span></span>
-      </div>
-      <p>Blue and green show where the later survey stands higher or looks more built up. Yellow sits close to little or no visible change. Orange and red show where the earlier survey stood higher, or where material appears to have been lost by the later survey.</p>
-    </div>
-  `;
-
   const setPreviewState = (enabled) => {
     els.volumeImageryGrid.classList.toggle("volume-imagery-grid--single", enabled);
     els.volumeCurrentCard.classList.toggle("is-hidden", enabled);
@@ -3649,7 +3635,6 @@ async function renderVolume() {
         <strong>How the trend layer is built</strong>
         <p>The trend panel is not just one before-and-after comparison. It looks across Survey 1, Survey 2, and Survey 3 together so we can separate steady build-up, steady lowering, and areas that changed direction over time.</p>
       </div>
-      ${volumeLegendMarkup}
       <div class="volume-explainer__block">
         <strong>Current area note</strong>
         <p>${escapeHtml(areaDataset?.notes || "Add a short plain-English note here to explain what changed in this part of the estuary.")}</p>
@@ -5185,8 +5170,8 @@ function comparisonReadinessCards(trendData, areaLabel) {
           <p class="muted">${escapeHtml(areaLabel)}</p>
           <h3>${escapeHtml(item.label)}</h3>
         </div>
-        <span class="chip volume-confidence-chip">${escapeHtml(item.status)}</span>
       </div>
+      <p class="volume-rollout-status">${escapeHtml(item.status)}</p>
       <p>${escapeHtml(item.detail)}</p>
       <p class="muted">${escapeHtml(item.note)}</p>
     </article>
