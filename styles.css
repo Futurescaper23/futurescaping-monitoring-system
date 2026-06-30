@@ -3278,6 +3278,89 @@ textarea {
   background: linear-gradient(180deg, rgba(77, 112, 166, 0.22), rgba(39, 60, 96, 0.3));
 }
 
+.volume-trend-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.volume-trend-map,
+.volume-trend-pair-card,
+.volume-trend-class-card,
+.volume-trend-callout {
+  margin: 0;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(77, 112, 166, 0.22), rgba(39, 60, 96, 0.3));
+}
+
+.volume-trend-map img {
+  width: 100%;
+  display: block;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(7, 17, 31, 0.88);
+}
+
+.volume-trend-map figcaption {
+  margin-top: 12px;
+}
+
+.volume-trend-summary {
+  display: grid;
+  gap: 18px;
+}
+
+.volume-trend-callout h3 {
+  margin: 8px 0 10px;
+}
+
+.volume-trend-callout p {
+  margin: 0;
+  color: rgba(223, 236, 255, 0.86);
+  line-height: 1.62;
+}
+
+.volume-trend-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.volume-trend-pairs,
+.volume-trend-classes {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.volume-trend-pairs {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.volume-trend-classes {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.volume-trend-pair-card h3 {
+  margin: 6px 0 10px;
+}
+
+.volume-trend-class-card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.volume-trend-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  flex: 0 0 16px;
+}
+
 .is-hidden {
   display: none !important;
 }
@@ -3358,12 +3441,16 @@ textarea {
 }
 
 @media (max-width: 1000px) {
+  .volume-trend-layout,
+  .volume-trend-pairs,
+  .volume-trend-classes,
   .volume-viewer-guide__grid,
   .volume-imagery-grid,
   .volume-card__grid {
     grid-template-columns: 1fr;
   }
 
+  .volume-trend-stats,
   .volume-viewer-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3375,6 +3462,7 @@ textarea {
 }
 
 @media (max-width: 700px) {
+  .volume-trend-stats,
   .volume-viewer-stats {
     grid-template-columns: 1fr;
   }

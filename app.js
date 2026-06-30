@@ -72,6 +72,12 @@ import { volumeChangeSettings } from "./src/data/volumeChange.js?v=20260529g";
 const VALID_TABS = new Set(projectConfig.navigation.tabs);
 const AREA_ENABLED_TOOLBAR_TABS = new Set(["panorama", "volume", "layers", "sections"]);
 const SURVEY_MODEL_TABS = new Set(["areas", "panorama", "volume", "layers", "sections"]);
+const area3TrendPaths = {
+  manifest: "./data/area3-trend-manifest.json",
+  stats: "./data/area3-trend-stats.json",
+  image: "./assets/area3-trend-classification.png"
+};
+let area3TrendCachePromise = null;
 
   const EXPLICIT_SECTION_IMAGE_TRACKS = {
     area1: [
@@ -436,6 +442,8 @@ const els = {
   volumeViewerGuide: byId("volumeViewerGuide"),
   volumeViewerStats: byId("volumeViewerStats"),
   volumeViewerDetails: byId("volumeViewerDetails"),
+  volumeTrendPanel: byId("volumeTrendPanel"),
+  volumeTrendBody: byId("volumeTrendBody"),
   volumeImageSummary: byId("volumeImageSummary"),
   volumeBaselineLabel: byId("volumeBaselineLabel"),
   volumeCurrentLabel: byId("volumeCurrentLabel"),
@@ -3291,6 +3299,7 @@ async function renderVolume() {
     || "Show base terrain turns the latest beach surface on or off. With it on, you can see the actual shape of the most recent scan underneath the colours. With it off, the change colours are easier to read on their own. Bigger point size makes the surface look fuller and easier to see. Smaller point size makes it look finer and lighter.";
   const viewerGuideUse = areaDataset?.viewerGuideUse
     || "Start by turning the model around and zooming into the area you care about. If the view feels too busy, switch off Show base terrain to focus on the colour change only. If the model looks too thin or patchy, increase point size. If it looks too chunky, reduce point size for a cleaner look.";
+  const trendData = area.id === volumeChangeSettings.sandboxAreaId ? await loadArea3TrendData() : null;
 
   const [baselineImageSrc, currentImageSrc, previewImageSrc, previewBaselineImageSrc, previewCurrentImageSrc] = await Promise.all([
     baselineSurvey ? resolveExistingAsset(surveyAssetCandidates(project.id, baselineSurvey.id, sandboxArea.id, "ortho.jpg")) : Promise.resolve(""),
@@ -3397,6 +3406,76 @@ async function renderVolume() {
         : "Viewer details will appear here once the trial metadata has been entered.")
     ].join("");
   };
+
+  const setTrendState = (data) => {
+    els.volumeTrendPanel.classList.toggle("is-hidden", !data);
+    if (!data) {
+      els.volumeTrendBody.innerHTML = "";
+      return;
+    }
+
+    const pairSummaries = trendPairSummaries(data.stats);
+    const topClass = sortedTrendClasses(data.stats.trend_classes || [])[0] || null;
+    els.volumeTrendBody.innerHTML = `
+      <div class="volume-trend-layout">
+        <figure class="volume-trend-map">
+          <img src="${escapeAttr(data.imageSrc)}" alt="Trend classification map for Area 3 across all three survey rounds">
+          <figcaption class="muted">Use this map as the long-term view. The 3D viewer shows one comparison at a time, while this shows the wider three-round pattern in one place.</figcaption>
+        </figure>
+        <div class="volume-trend-summary">
+          <div class="volume-trend-callout">
+            <span class="eyebrow">Plain-English takeaway</span>
+            <h3>${escapeHtml(data.manifest.summary?.top_trend_class || topClass?.label || "Trend review")}</h3>
+            <p>${escapeHtml(trendHeadline(topClass))}</p>
+          </div>
+          <div class="stats-grid volume-trend-stats">
+            ${metric("Main pattern", topClass?.label || "--", "Largest classified behaviour across the footprint")}
+            ${metric("Trend coverage", formatSquareMetres(data.stats.classified_area?.valid_area_m2 || 0), `${fixed(data.stats.classified_area?.coverage_percent_of_boundary || 0, 1)}% of the reporting boundary`)}
+            ${metric("Classification threshold", `${fixed(data.stats.classification_threshold_m || 0, 2)} m`, "Smaller changes than this are treated as effectively stable")}
+            ${metric("Survey rounds", String(data.stats.survey_rounds?.length || 0), "March, April, and June are all included")}
+          </div>
+        </div>
+      </div>
+      <div class="volume-trend-pairs">
+        ${pairSummaries.map((item) => `
+          <article class="volume-trend-pair-card">
+            <p class="eyebrow">${escapeHtml(item.label)}</p>
+            <h3>${escapeHtml(item.readoutTitle)}</h3>
+            <p>${escapeHtml(item.readoutCopy)}</p>
+            <div class="volume-card__grid">
+              <div class="volume-mini volume-mini--gain">
+                <span class="muted">Material added</span>
+                <strong>${escapeHtml(formatVolume(item.added))}</strong>
+              </div>
+              <div class="volume-mini volume-mini--loss">
+                <span class="muted">Material removed</span>
+                <strong>${escapeHtml(formatVolume(item.removed))}</strong>
+              </div>
+              <div class="volume-mini volume-mini--net">
+                <span class="muted">Overall balance</span>
+                <strong>${escapeHtml(formatVolume(item.net))}</strong>
+              </div>
+            </div>
+            <p class="muted">${escapeHtml(item.supportingCopy)}</p>
+          </article>
+        `).join("")}
+      </div>
+      <div class="volume-trend-classes">
+        ${sortedTrendClasses(data.stats.trend_classes || []).map((item) => `
+          <article class="volume-trend-class-card">
+            <div class="volume-trend-class-card__head">
+              <span class="volume-trend-swatch" style="background: rgb(${item.color_rgba.slice(0, 3).join(",")});"></span>
+              <strong>${escapeHtml(item.label)}</strong>
+            </div>
+            <p>${escapeHtml(trendClassExplanation(item.key))}</p>
+            <p class="muted">${escapeHtml(`${formatSquareMetres(item.area_m2)} | ${fixed(item.percent_of_classified_area, 1)}% of the classified area`)}</p>
+          </article>
+        `).join("")}
+      </div>
+    `;
+  };
+
+  setTrendState(trendData);
 
   els.volumeSandboxBanner.innerHTML = `
     <strong>Sandbox Preview - Area 3 only</strong>
@@ -5067,6 +5146,102 @@ function formatVolume(value) {
   const number = Number(value || 0);
   const rounded = Math.abs(number) >= 100 ? number.toFixed(0) : number.toFixed(1);
   return `${rounded} m3`;
+}
+
+function formatSquareMetres(value) {
+  const number = Number(value || 0);
+  return `${number.toLocaleString("en-GB", { maximumFractionDigits: 0 })} m2`;
+}
+
+async function loadArea3TrendData() {
+  if (!area3TrendCachePromise) {
+    area3TrendCachePromise = (async () => {
+      const [manifestResponse, statsResponse, imageSrc] = await Promise.all([
+        fetch(area3TrendPaths.manifest).catch(() => null),
+        fetch(area3TrendPaths.stats).catch(() => null),
+        resolveExistingAsset([area3TrendPaths.image])
+      ]);
+      if (!manifestResponse?.ok || !statsResponse?.ok || !imageSrc) {
+        return null;
+      }
+      const [manifest, stats] = await Promise.all([
+        manifestResponse.json(),
+        statsResponse.json()
+      ]);
+      return { manifest, stats, imageSrc };
+    })();
+  }
+  return area3TrendCachePromise;
+}
+
+function trendPairSummaries(stats) {
+  const pairAB = stats?.classification_inputs?.primary_pair_1;
+  const pairBC = stats?.classification_inputs?.primary_pair_2;
+  const pairAC = stats?.classification_inputs?.cumulative_pairs?.[0];
+  return [
+    pairAB ? { label: "Survey 1 vs Survey 2", dateRange: pairAB.date_range, intervalDays: pairAB.interval_days, ...pairAB.volume_stats } : null,
+    pairAC ? { label: "Survey 1 vs Survey 3", dateRange: "22 Mar 2026 to 17 Jun 2026", intervalDays: 87, ...pairAC.volume_stats } : null,
+    pairBC ? { label: "Survey 2 vs Survey 3", dateRange: pairBC.date_range, intervalDays: pairBC.interval_days, ...pairBC.volume_stats } : null
+  ].filter(Boolean).map((item) => {
+    const net = Number(item.net_volume_m3 || 0);
+    return {
+      label: item.label,
+      added: Number(item.added_volume_m3 || 0),
+      removed: Number(item.removed_volume_m3 || 0),
+      net,
+      readoutTitle: net >= 0 ? "Net build-up" : "Net lowering",
+      readoutCopy: net >= 0
+        ? `${item.label} ends with more material in the later survey overall.`
+        : `${item.label} ends with less material in the later survey overall.`,
+      supportingCopy: `${item.dateRange} • ${item.intervalDays} day gap • ${fixed(item.matching_cells_percent || 0, 1)}% of cells matched cleanly.`
+    };
+  });
+}
+
+function sortedTrendClasses(items) {
+  return [...items].sort((a, b) => Number(b.area_m2 || 0) - Number(a.area_m2 || 0));
+}
+
+function trendHeadline(topClass) {
+  switch (topClass?.key) {
+    case "consistent_accretion":
+      return "The main pattern here is steady build-up, so this part of the footprint has mostly kept getting higher from one survey to the next.";
+    case "consistent_erosion":
+      return "The main pattern here is steady lowering, so this part of the footprint has mostly kept losing material from one survey to the next.";
+    case "accretion_then_erosion":
+      return "The main pattern here is build-up first, then lowering later. In plain English, material gathered earlier in the season, then some of that gain was lost again by June.";
+    case "erosion_then_accretion":
+      return "The main pattern here is lowering first, then recovery later. In plain English, this area dipped earlier on, then built back up by June.";
+    case "stable":
+      return "A large part of this footprint stayed broadly similar across all three rounds, so it did not move enough to count as a meaningful rise or fall.";
+    default:
+      return "This panel shows the longer-term story across all three survey rounds, not just one before-and-after pair.";
+  }
+}
+
+function trendClassExplanation(key) {
+  switch (key) {
+    case "consistent_accretion":
+      return "This part kept building up from round to round.";
+    case "consistent_erosion":
+      return "This part kept lowering from round to round.";
+    case "accretion_then_erosion":
+      return "This part built up first, then dropped back later.";
+    case "erosion_then_accretion":
+      return "This part lowered first, then built back up later.";
+    case "stable":
+      return "This part stayed broadly the same across the survey set.";
+    case "new_latest_accretion":
+      return "This part mainly changed in the latest round, ending up higher by June.";
+    case "new_latest_erosion":
+      return "This part mainly changed in the latest round, ending up lower by June.";
+    case "earlier_accretion_now_stable":
+      return "This part built up earlier, then mostly held that newer shape.";
+    case "earlier_erosion_now_stable":
+      return "This part lowered earlier, then mostly settled into that newer level.";
+    default:
+      return "This colour marks one of the repeated change patterns picked up across all three rounds.";
+  }
 }
 
 function parseVolumeRows(text) {
