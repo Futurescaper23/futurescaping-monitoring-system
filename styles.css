@@ -3316,8 +3316,8 @@ textarea {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: auto;
-  height: 82%;
+  width: 42%;
+  height: auto;
   max-width: none;
   max-height: none;
   transform: translate(-50%, -50%) rotate(90deg);
@@ -3529,7 +3529,7 @@ textarea {
   }
 
   .volume-trend-map--rotated img {
-    height: 80%;
+    width: 46%;
   }
 
   .volume-viewer-stage,
@@ -3548,7 +3548,7 @@ textarea {
   }
 
   .volume-trend-map--rotated img {
-    height: 76%;
+    width: 56%;
   }
 
   .volume-viewer-stage,
