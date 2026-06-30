@@ -445,6 +445,7 @@ const els = {
   volumeTrendPanel: byId("volumeTrendPanel"),
   volumeTrendBody: byId("volumeTrendBody"),
   volumeImageSummary: byId("volumeImageSummary"),
+  volumeReferenceSelector: byId("volumeReferenceSelector"),
   volumeBaselineLabel: byId("volumeBaselineLabel"),
   volumeCurrentLabel: byId("volumeCurrentLabel"),
   volumeBaselineImage: byId("volumeBaselineImage"),
@@ -3355,6 +3356,8 @@ async function renderVolume() {
     els.volumeCurrentCard.classList.toggle("is-hidden", enabled);
   };
 
+  renderVolumeReferenceSelector("ab", []);
+
   const setViewerState = (enabled) => {
     els.volumeViewerPanel.classList.toggle("is-hidden", !enabled);
     if (!enabled) {
@@ -3574,13 +3577,14 @@ async function renderVolume() {
     els.volumeSummary.textContent = `${area.label} is being compared between ${baselineSurvey?.shortDate || baselineLabel} and ${survey.shortDate}. This first preview shows where the monitored sandbar appears to have built up or worn away over the short gap between surveys.`;
     els.volumeImageSummary.textContent = "The preview map keeps things simple: it shows the measured sandbar, where the change is concentrated, and how the later survey compares with the earlier one.";
   } else if (usePairedPreview) {
+    renderVolumeReferenceSelector("ab", ["ab"]);
     setPreviewState(false);
     renderVolumePolygonOverlay(els.volumeBaselineOverlay, []);
     renderVolumePolygonOverlay(els.volumeCurrentOverlay, []);
-    els.volumeBaselineChip.textContent = previewBaselineLabel || "Earlier change context";
-    els.volumeCurrentChip.textContent = previewCurrentLabel || "Later change context";
-    els.volumeBaselineLabel.textContent = previewBaselineLabel || baselineSurvey?.shortDate || "Earlier survey";
-    els.volumeCurrentLabel.textContent = previewCurrentLabel || survey.shortDate;
+    els.volumeBaselineChip.textContent = "Survey 1 vs Survey 2";
+    els.volumeCurrentChip.textContent = "Survey 1 vs Survey 2";
+    els.volumeBaselineLabel.textContent = previewBaselineLabel || "Survey 1 vs Survey 2 height change analysis";
+    els.volumeCurrentLabel.textContent = previewCurrentLabel || "Survey 1 vs Survey 2 gain and loss classification";
     els.volumeBaselineImage.src = previewBaselineImageSrc;
     els.volumeBaselineImage.alt = `${area.label} ${baselineLabel} volume change context`;
     els.volumeBaselineCaption.textContent = previewBaselineCaption || `${area.label} with the measured change overlay shown against the earlier survey context.`;
@@ -3588,7 +3592,7 @@ async function renderVolume() {
     els.volumeCurrentImage.alt = `${area.label} ${survey.label} volume change context`;
     els.volumeCurrentCaption.textContent = previewCurrentCaption || `${area.label} with the measured change overlay shown against the later survey context.`;
     els.volumeSummary.textContent = `${area.label} is being compared between ${baselineSurvey?.shortDate || baselineLabel} and ${survey.shortDate}. This trial now pairs the measured totals with a live 3D viewer and two flat reference maps so the change is easier to interpret from different angles.`;
-    els.volumeImageSummary.textContent = "These downloaded reference maps sit alongside the 3D viewer: one shows the measured height-change surface, and the other simplifies the same result into gain-and-loss classes.";
+    els.volumeImageSummary.textContent = "These reference maps currently relate to Survey 1 vs Survey 2 only. The Survey 1 vs Survey 3 and Survey 2 vs Survey 3 slots are ready to be added here once those matching map sets have been prepared.";
   } else {
     renderVolumePolygonOverlay(els.volumeBaselineOverlay, baselineImageExists ? polygons : []);
     renderVolumePolygonOverlay(els.volumeCurrentOverlay, currentImageExists ? polygons : []);
@@ -5191,6 +5195,24 @@ function trendPairSummaries(stats) {
       supportingCopy: `${item.dateRange} • ${item.intervalDays} day gap • ${fixed(item.matching_cells_percent || 0, 1)}% of cells matched cleanly.`
     };
   });
+}
+
+function renderVolumeReferenceSelector(activeKey = "ab", availableKeys = []) {
+  const options = [
+    { key: "ab", label: "Survey 1 vs Survey 2" },
+    { key: "ac", label: "Survey 1 vs Survey 3" },
+    { key: "bc", label: "Survey 2 vs Survey 3" }
+  ];
+  els.volumeReferenceSelector.innerHTML = options.map((item) => {
+    const isActive = item.key === activeKey;
+    const isAvailable = availableKeys.includes(item.key);
+    return `
+      <span class="volume-reference-pill ${isActive ? "active" : ""} ${isAvailable ? "" : "is-disabled"}">
+        <strong>${escapeHtml(item.label)}</strong>
+        <span>${escapeHtml(isAvailable ? (isActive ? "Reference maps shown below" : "Available") : "Coming soon")}</span>
+      </span>
+    `;
+  }).join("");
 }
 
 function sortedTrendClasses(items) {

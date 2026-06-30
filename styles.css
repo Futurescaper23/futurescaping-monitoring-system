@@ -3181,6 +3181,40 @@ textarea {
   gap: 18px;
 }
 
+.volume-reference-selector {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.volume-reference-pill {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(121, 167, 255, 0.14);
+  background: linear-gradient(180deg, rgba(55, 83, 126, 0.99), rgba(40, 64, 101, 0.95));
+  color: #e9f2ff;
+}
+
+.volume-reference-pill strong {
+  font-size: 0.92rem;
+}
+
+.volume-reference-pill span {
+  font-size: 0.8rem;
+  color: rgba(213, 229, 255, 0.78);
+}
+
+.volume-reference-pill.active {
+  border-color: rgba(85, 200, 255, 0.4);
+  box-shadow: 0 0 0 1px rgba(85, 200, 255, 0.16) inset;
+}
+
+.volume-reference-pill.is-disabled {
+  opacity: 0.72;
+}
+
 .volume-viewer-layout {
   display: block;
 }
@@ -3504,6 +3538,7 @@ textarea {
 @media (max-width: 1000px) {
   .volume-trend-pairs,
   .volume-trend-classes,
+  .volume-reference-selector,
   .volume-viewer-guide__grid,
   .volume-imagery-grid,
   .volume-card__grid {
