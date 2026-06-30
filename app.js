@@ -3363,6 +3363,7 @@ async function renderVolume() {
       els.volumeViewerSummary.textContent = "";
       els.volumeViewerGuide.innerHTML = "";
       els.volumeViewerStats.innerHTML = "";
+      els.volumeViewerStats.classList.add("is-hidden");
       els.volumeViewerDetails.innerHTML = "";
       return;
     }
@@ -3390,14 +3391,8 @@ async function renderVolume() {
       </div>
     `;
     els.volumeViewerFrame.src = viewerEmbedUrl;
-    els.volumeViewerStats.innerHTML = viewerStats
-      ? [
-        metric("Analysed area", viewerStats.analysedArea || "--", "Measured footprint compared in this trial"),
-        metric("Gain area", viewerStats.gainArea || "--", "Where the later survey sits higher"),
-        metric("Loss area", viewerStats.lossArea || "--", "Where the later survey sits lower"),
-        metric("Matching cells", viewerStats.matchingCells || "--", "How much of the two surfaces aligned cleanly")
-      ].join("")
-      : "";
+    els.volumeViewerStats.innerHTML = "";
+    els.volumeViewerStats.classList.add("is-hidden");
     els.volumeViewerDetails.innerHTML = [
       detail("How to use it", "Drag to orbit, scroll to zoom, and pan to inspect where the change surface sits against the underlying terrain."),
       detail("What the colours mean", "Cool colours show relative build-up, warmer colours show relative lowering, and the paired maps underneath give a flatter plan-view readout."),
@@ -3417,23 +3412,20 @@ async function renderVolume() {
     const pairSummaries = trendPairSummaries(data.stats);
     const topClass = sortedTrendClasses(data.stats.trend_classes || [])[0] || null;
     els.volumeTrendBody.innerHTML = `
-      <div class="volume-trend-layout">
-        <figure class="volume-trend-map">
+      <div class="volume-trend-stage">
+        <figure class="volume-trend-map volume-trend-map--wide">
           <img src="${escapeAttr(data.imageSrc)}" alt="Trend classification map for Area 3 across all three survey rounds">
           <figcaption class="muted">Use this map as the long-term view. The 3D viewer shows one comparison at a time, while this shows the wider three-round pattern in one place.</figcaption>
         </figure>
-        <div class="volume-trend-summary">
-          <div class="volume-trend-callout">
-            <span class="eyebrow">Plain-English takeaway</span>
-            <h3>${escapeHtml(data.manifest.summary?.top_trend_class || topClass?.label || "Trend review")}</h3>
-            <p>${escapeHtml(trendHeadline(topClass))}</p>
+        <div class="volume-trend-callout">
+          <div class="volume-trend-callout__head">
+            <div>
+              <span class="eyebrow">Plain-English takeaway</span>
+              <h3>${escapeHtml(data.manifest.summary?.top_trend_class || topClass?.label || "Trend review")}</h3>
+            </div>
+            <p class="volume-trend-meta">${escapeHtml(`${formatSquareMetres(data.stats.classified_area?.valid_area_m2 || 0)} reviewed | ${fixed(data.stats.classified_area?.coverage_percent_of_boundary || 0, 1)}% coverage | ${fixed(data.stats.classification_threshold_m || 0, 2)} m threshold`)}</p>
           </div>
-          <div class="stats-grid volume-trend-stats">
-            ${metric("Main pattern", topClass?.label || "--", "Largest classified behaviour across the footprint")}
-            ${metric("Trend coverage", formatSquareMetres(data.stats.classified_area?.valid_area_m2 || 0), `${fixed(data.stats.classified_area?.coverage_percent_of_boundary || 0, 1)}% of the reporting boundary`)}
-            ${metric("Classification threshold", `${fixed(data.stats.classification_threshold_m || 0, 2)} m`, "Smaller changes than this are treated as effectively stable")}
-            ${metric("Survey rounds", String(data.stats.survey_rounds?.length || 0), "March, April, and June are all included")}
-          </div>
+          <p>${escapeHtml(trendHeadline(topClass))}</p>
         </div>
       </div>
       <div class="volume-trend-pairs">
@@ -3476,6 +3468,7 @@ async function renderVolume() {
   };
 
   setTrendState(trendData);
+  els.volumeMetricGrid.classList.add("is-hidden");
 
   els.volumeSandboxBanner.innerHTML = `
     <strong>Sandbox Preview - Area 3 only</strong>
