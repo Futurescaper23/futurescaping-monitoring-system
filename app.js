@@ -66,7 +66,8 @@ import { volumeChangeSettings } from "./src/data/volumeChange.js?v=20260529g";
   processedHighlightAssetCache: new Map(),
   sectionTrackCache: new Map(),
   sectionArea: null,
-  sectionComparisonSnapshot: null
+  sectionComparisonSnapshot: null,
+  volumeLightboxZoom: 1
     };
 
 const VALID_TABS = new Set(projectConfig.navigation.tabs);
@@ -445,23 +446,21 @@ const els = {
   volumeTrendPanel: byId("volumeTrendPanel"),
   volumeTrendBody: byId("volumeTrendBody"),
   volumeImageSummary: byId("volumeImageSummary"),
-  volumeReferenceSelector: byId("volumeReferenceSelector"),
-  volumeBaselineLabel: byId("volumeBaselineLabel"),
-  volumeCurrentLabel: byId("volumeCurrentLabel"),
-  volumeBaselineImage: byId("volumeBaselineImage"),
-  volumeCurrentImage: byId("volumeCurrentImage"),
-  volumeBaselineOverlay: byId("volumeBaselineOverlay"),
-  volumeCurrentOverlay: byId("volumeCurrentOverlay"),
-  volumeBaselineCaption: byId("volumeBaselineCaption"),
-  volumeCurrentCaption: byId("volumeCurrentCaption"),
   volumeMethod: byId("volumeMethod"),
   volumeNarrative: byId("volumeNarrative"),
   volumeAreaGrid: byId("volumeAreaGrid"),
   volumeImageryGrid: byId("volumeImageryGrid"),
-  volumeBaselineCard: byId("volumeBaselineCard"),
-  volumeCurrentCard: byId("volumeCurrentCard"),
-  volumeBaselineChip: byId("volumeBaselineChip"),
-  volumeCurrentChip: byId("volumeCurrentChip"),
+  volumeImageLightbox: byId("volumeImageLightbox"),
+  volumeImageLightboxBackdrop: byId("volumeImageLightboxBackdrop"),
+  volumeImageLightboxClose: byId("volumeImageLightboxClose"),
+  volumeImageLightboxEyebrow: byId("volumeImageLightboxEyebrow"),
+  volumeImageLightboxTitle: byId("volumeImageLightboxTitle"),
+  volumeImageLightboxCaption: byId("volumeImageLightboxCaption"),
+  volumeImageLightboxViewport: byId("volumeImageLightboxViewport"),
+  volumeImageLightboxImage: byId("volumeImageLightboxImage"),
+  volumeImageLightboxZoomIn: byId("volumeImageLightboxZoomIn"),
+  volumeImageLightboxZoomOut: byId("volumeImageLightboxZoomOut"),
+  volumeImageLightboxReset: byId("volumeImageLightboxReset"),
   viewerTitle: byId("viewerTitle"),
   layerWorkspace: byId("layerWorkspace"),
   primaryCompareSelect: byId("primaryCompareSelect"),
@@ -877,6 +876,32 @@ function bindEvents() {
   });
   els.sectionInsightOverlayClose.addEventListener("click", closeSectionInsightOverlay);
   els.sectionInsightOverlayBackdrop.addEventListener("click", closeSectionInsightOverlay);
+  els.volumeImageryGrid?.addEventListener("click", (event) => {
+    const trigger = event.target.closest("[data-volume-lightbox-src]");
+    if (!trigger) {
+      return;
+    }
+    openVolumeImageLightbox(
+      trigger.dataset.volumeLightboxEyebrow || "Reference map",
+      trigger.dataset.volumeLightboxTitle || "Reference image",
+      trigger.dataset.volumeLightboxCaption || "",
+      trigger.dataset.volumeLightboxSrc || "",
+      trigger.dataset.volumeLightboxAlt || trigger.dataset.volumeLightboxTitle || "Reference image"
+    );
+  });
+  els.volumeImageLightboxClose?.addEventListener("click", closeVolumeImageLightbox);
+  els.volumeImageLightboxBackdrop?.addEventListener("click", closeVolumeImageLightbox);
+  els.volumeImageLightboxZoomIn?.addEventListener("click", () => setVolumeImageLightboxZoom(state.volumeLightboxZoom * 1.2));
+  els.volumeImageLightboxZoomOut?.addEventListener("click", () => setVolumeImageLightboxZoom(state.volumeLightboxZoom / 1.2));
+  els.volumeImageLightboxReset?.addEventListener("click", () => setVolumeImageLightboxZoom(1));
+  els.volumeImageLightboxViewport?.addEventListener("wheel", (event) => {
+    if (els.volumeImageLightbox?.classList.contains("hidden")) {
+      return;
+    }
+    event.preventDefault();
+    const direction = event.deltaY < 0 ? 1.12 : 1 / 1.12;
+    setVolumeImageLightboxZoom(state.volumeLightboxZoom * direction);
+  }, { passive: false });
   els.sectionComparisonSnapshotBtn?.addEventListener("click", () => {
     if (!state.sectionComparisonSnapshot) {
       return;
@@ -892,6 +917,7 @@ function bindEvents() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       closeSectionInsightOverlay();
+      closeVolumeImageLightbox();
     }
   });
   document.addEventListener("fullscreenchange", () => {
@@ -3277,7 +3303,19 @@ async function renderVolume() {
     || "Start by turning the model around and zooming into the area you care about. If the view feels too busy, switch off Show base terrain to focus on the colour change only. If the model looks too thin or patchy, increase point size. If it looks too chunky, reduce point size for a cleaner look.";
   const trendData = area.id === volumeChangeSettings.sandboxAreaId ? await loadArea3TrendData() : null;
 
-  const [baselineImageSrc, currentImageSrc, previewImageSrc, previewBaselineImageSrc, previewCurrentImageSrc] = await Promise.all([
+  const [
+    baselineImageSrc,
+    currentImageSrc,
+    previewImageSrc,
+    previewBaselineImageSrc,
+    previewCurrentImageSrc,
+    surveyOneVsTwoHeightSrc,
+    surveyOneVsTwoClassSrc,
+    surveyOneVsThreeHeightSrc,
+    surveyOneVsThreeClassSrc,
+    surveyTwoVsThreeHeightSrc,
+    surveyTwoVsThreeClassSrc
+  ] = await Promise.all([
     baselineSurvey ? resolveExistingAsset(surveyAssetCandidates(project.id, baselineSurvey.id, sandboxArea.id, "ortho.jpg")) : Promise.resolve(""),
     resolveExistingAsset(surveyAssetCandidates(project.id, survey.id, sandboxArea.id, "ortho.jpg")),
     previewImageFile
@@ -3297,13 +3335,91 @@ async function renderVolume() {
         surveyAssetPath(project.id, survey.id, sandboxArea.id, previewCurrentImageFile),
         baselineSurvey ? surveyAssetPath(project.id, baselineSurvey.id, sandboxArea.id, previewCurrentImageFile) : ""
       ])
-      : Promise.resolve("")
+      : Promise.resolve(""),
+    resolveExistingAsset([
+      surveyAssetPath(project.id, "2026-04-18", sandboxArea.id, "area3_s1_vs_s2_height_change_analysis.png"),
+      surveyAssetPath(project.id, "2026-04-18", sandboxArea.id, "area3_height_change_analysis.png"),
+      surveyAssetPath(project.id, "2026-04-18", sandboxArea.id, "area3_height_change_analysis.jpg")
+    ]),
+    resolveExistingAsset([
+      surveyAssetPath(project.id, "2026-04-18", sandboxArea.id, "area3_s1_vs_s2_gain_loss_classification.png"),
+      surveyAssetPath(project.id, "2026-04-18", sandboxArea.id, "area3_gain_loss_classification.png"),
+      surveyAssetPath(project.id, "2026-04-18", sandboxArea.id, "area3_gain_loss_classification.jpg")
+    ]),
+    resolveExistingAsset([
+      surveyAssetPath(project.id, "2026-06-16", sandboxArea.id, "area3_s1_vs_s3_height_change_analysis.png")
+    ]),
+    resolveExistingAsset([
+      surveyAssetPath(project.id, "2026-06-16", sandboxArea.id, "area3_s1_vs_s3_gain_loss_classification.png")
+    ]),
+    resolveExistingAsset([
+      surveyAssetPath(project.id, "2026-06-16", sandboxArea.id, "area3_s2_vs_s3_height_change_analysis.png")
+    ]),
+    resolveExistingAsset([
+      surveyAssetPath(project.id, "2026-06-16", sandboxArea.id, "area3_s2_vs_s3_gain_loss_classification.png")
+    ])
   ]);
 
   const baselineImageExists = Boolean(baselineImageSrc);
   const currentImageExists = Boolean(currentImageSrc);
   const useSinglePreview = hasConfiguredRows && previewMode === "single" && Boolean(previewImageSrc);
   const usePairedPreview = hasConfiguredRows && previewMode === "pair" && Boolean(previewBaselineImageSrc) && Boolean(previewCurrentImageSrc);
+  const allReferenceMaps = [
+    {
+      eyebrow: "Height change analysis",
+      title: "Survey 1 vs Survey 2",
+      badge: "Comparison 1",
+      label: "Measured surface difference",
+      src: surveyOneVsTwoHeightSrc,
+      alt: `${area.label} Survey 1 versus Survey 2 height change analysis`,
+      caption: "Survey 1 versus Survey 2 height change map. Use this to see where the later survey sits higher or lower across the measured footprint."
+    },
+    {
+      eyebrow: "Height change analysis",
+      title: "Survey 1 vs Survey 3",
+      badge: "Comparison 2",
+      label: "Measured surface difference",
+      src: surveyOneVsThreeHeightSrc,
+      alt: `${area.label} Survey 1 versus Survey 3 height change analysis`,
+      caption: "Survey 1 versus Survey 3 height change map. This gives the longer-gap view from the March round straight through to June."
+    },
+    {
+      eyebrow: "Height change analysis",
+      title: "Survey 2 vs Survey 3",
+      badge: "Comparison 3",
+      label: "Measured surface difference",
+      src: surveyTwoVsThreeHeightSrc,
+      alt: `${area.label} Survey 2 versus Survey 3 height change analysis`,
+      caption: "Survey 2 versus Survey 3 height change map. This isolates what changed between the April and June rounds."
+    },
+    {
+      eyebrow: "Gain and loss classes",
+      title: "Survey 1 vs Survey 2",
+      badge: "Comparison 1",
+      label: "Simplified class view",
+      src: surveyOneVsTwoClassSrc,
+      alt: `${area.label} Survey 1 versus Survey 2 gain and loss classification`,
+      caption: "Survey 1 versus Survey 2 class map. This is the simpler flat-view version for quick client-facing reading."
+    },
+    {
+      eyebrow: "Gain and loss classes",
+      title: "Survey 1 vs Survey 3",
+      badge: "Comparison 2",
+      label: "Simplified class view",
+      src: surveyOneVsThreeClassSrc,
+      alt: `${area.label} Survey 1 versus Survey 3 gain and loss classification`,
+      caption: "Survey 1 versus Survey 3 class map. This shows the broader build-up and lowering pattern across the full time gap."
+    },
+    {
+      eyebrow: "Gain and loss classes",
+      title: "Survey 2 vs Survey 3",
+      badge: "Comparison 3",
+      label: "Simplified class view",
+      src: surveyTwoVsThreeClassSrc,
+      alt: `${area.label} Survey 2 versus Survey 3 gain and loss classification`,
+      caption: "Survey 2 versus Survey 3 class map. Use this for the latest repeat-survey pattern only."
+    }
+  ].filter((item) => item.src);
 
   const totals = configuredPolygons.reduce((acc, item) => {
     acc.gain += Number(item.gainM3 || 0);
@@ -3311,13 +3427,6 @@ async function renderVolume() {
     acc.net += Number(item.netM3 || 0);
     return acc;
   }, { gain: 0, loss: 0, net: 0 });
-
-  const setPreviewState = (enabled) => {
-    els.volumeImageryGrid.classList.toggle("volume-imagery-grid--single", enabled);
-    els.volumeCurrentCard.classList.toggle("is-hidden", enabled);
-  };
-
-  renderVolumeReferenceSelector("ab", []);
 
   const setViewerState = (enabled) => {
     els.volumeViewerPanel.classList.toggle("is-hidden", !enabled);
@@ -3443,25 +3552,17 @@ async function renderVolume() {
 
   if (!baselineSurvey && !volumeDataset) {
     setViewerState(false);
-    setPreviewState(false);
-    renderVolumePolygonOverlay(els.volumeBaselineOverlay, []);
-    renderVolumePolygonOverlay(els.volumeCurrentOverlay, currentImageExists ? polygons : []);
     els.volumeSummary.textContent = `${survey.label} is the baseline round, so sandbar change is not available yet. Switch to a later survey round once a comparison has been calculated.`;
     els.volumeImageSummary.textContent = "The image panel will show the first before-and-after sandbar preview once a later survey round exists.";
-    els.volumeBaselineChip.textContent = "Baseline placeholder";
-    els.volumeCurrentChip.textContent = "Current aerial view";
-    els.volumeBaselineLabel.textContent = "No earlier comparison yet";
-    els.volumeCurrentLabel.textContent = survey.shortDate;
-    els.volumeBaselineImage.removeAttribute("src");
-    els.volumeBaselineCaption.textContent = "Sandbar change previews begin once a later survey round is available for the same area.";
-    if (currentImageExists) {
-      els.volumeCurrentImage.src = currentImageSrc;
-      els.volumeCurrentImage.alt = `${area.label} ${survey.label} aerial view`;
-      els.volumeCurrentCaption.textContent = `${area.label} in ${survey.label}. This acts as the visual starting point for later sandbar change reporting.`;
-    } else {
-      els.volumeCurrentImage.removeAttribute("src");
-      els.volumeCurrentCaption.textContent = "No aerial view has been uploaded yet for this area in the selected survey.";
-    }
+    renderVolumeReferenceGallery(currentImageExists ? [{
+      eyebrow: "Current aerial view",
+      title: survey.shortDate,
+      badge: area.overviewCode,
+      label: area.label,
+      src: currentImageSrc,
+      alt: `${area.label} ${survey.label} aerial view`,
+      caption: `${area.label} in ${survey.label}. This acts as the visual starting point for later sandbar change reporting.`
+    }] : []);
     els.volumeMetricGrid.innerHTML = [
       metric("Selected survey", survey.shortDate, "Current round"),
       metric("Comparison status", "Baseline only", "Change reporting starts on repeat rounds"),
@@ -3501,85 +3602,98 @@ async function renderVolume() {
     : (baselineSurvey?.label || "baseline survey");
 
   if (!hasConfiguredRows) {
-    setPreviewState(true);
-    renderVolumePolygonOverlay(els.volumeBaselineOverlay, []);
-    renderVolumePolygonOverlay(els.volumeCurrentOverlay, []);
-    els.volumeBaselineChip.textContent = "Preview coming soon";
-    els.volumeBaselineLabel.textContent = `${area.label} test area`;
+    const previewFallbackCards = [];
     if (currentImageExists) {
-      els.volumeBaselineImage.src = currentImageSrc;
-      els.volumeBaselineImage.alt = `${area.label} ${survey.label} aerial view`;
-      els.volumeBaselineCaption.textContent = `${area.label} is ready for sandbar-change testing, but this area does not yet have a finished preview map or measured results.`;
+      previewFallbackCards.push({
+        eyebrow: "Preview coming soon",
+        title: `${area.label} test area`,
+        badge: survey.shortDate,
+        label: "Latest aerial context",
+        src: currentImageSrc,
+        alt: `${area.label} ${survey.label} aerial view`,
+        caption: `${area.label} is ready for sandbar-change testing, but this area does not yet have a finished preview map or measured results.`
+      });
     } else if (baselineImageExists) {
-      els.volumeBaselineImage.src = baselineImageSrc;
-      els.volumeBaselineImage.alt = `${area.label} ${baselineLabel} aerial view`;
-      els.volumeBaselineCaption.textContent = `${area.label} is ready for sandbar-change testing, but this area does not yet have a finished preview map or measured results.`;
-    } else {
-      els.volumeBaselineImage.removeAttribute("src");
-      els.volumeBaselineCaption.textContent = `${area.label} is ready for sandbar-change testing, but no preview image has been prepared yet.`;
+      previewFallbackCards.push({
+        eyebrow: "Preview coming soon",
+        title: `${area.label} test area`,
+        badge: baselineSurvey?.shortDate || "Baseline",
+        label: "Earlier aerial context",
+        src: baselineImageSrc,
+        alt: `${area.label} ${baselineLabel} aerial view`,
+        caption: `${area.label} is ready for sandbar-change testing, but this area does not yet have a finished preview map or measured results.`
+      });
     }
-    els.volumeCurrentImage.removeAttribute("src");
-    els.volumeCurrentCaption.textContent = "";
+    renderVolumeReferenceGallery(previewFallbackCards);
     els.volumeSummary.textContent = `${area.label} is still in testing for sandbar volume change. ${area.label} currently shows the first working preview of what this page will become as more measured results are added.`;
     els.volumeImageSummary.textContent = "This area is set up for the workflow, but the finished preview map and measured sandbar figures have not been added yet.";
   } else {
-  setPreviewState(useSinglePreview);
-
-  if (useSinglePreview) {
-    renderVolumePolygonOverlay(els.volumeBaselineOverlay, []);
-    renderVolumePolygonOverlay(els.volumeCurrentOverlay, []);
-    els.volumeBaselineChip.textContent = "Preview change map";
-    els.volumeBaselineLabel.textContent = previewLabel;
-    els.volumeBaselineImage.src = previewImageSrc;
-    els.volumeBaselineImage.alt = `${area.label} sandbar change preview`;
-    els.volumeBaselineCaption.textContent = previewCaption;
-    els.volumeCurrentImage.removeAttribute("src");
-    els.volumeCurrentCaption.textContent = "";
+    if (useSinglePreview) {
+      renderVolumeReferenceGallery([{
+        eyebrow: "Preview change map",
+        title: previewLabel,
+        badge: `${baselineSurvey?.shortDate || baselineLabel} to ${survey.shortDate}`,
+        label: area.label,
+        src: previewImageSrc,
+        alt: `${area.label} sandbar change preview`,
+        caption: previewCaption
+      }], { single: true });
     els.volumeSummary.textContent = `${area.label} is being compared between ${baselineSurvey?.shortDate || baselineLabel} and ${survey.shortDate}. This first preview shows where the monitored sandbar appears to have built up or worn away over the short gap between surveys.`;
     els.volumeImageSummary.textContent = "The preview map keeps things simple: it shows the measured sandbar, where the change is concentrated, and how the later survey compares with the earlier one.";
-  } else if (usePairedPreview) {
-    renderVolumeReferenceSelector("ab", ["ab"]);
-    setPreviewState(false);
-    renderVolumePolygonOverlay(els.volumeBaselineOverlay, []);
-    renderVolumePolygonOverlay(els.volumeCurrentOverlay, []);
-    els.volumeBaselineChip.textContent = "Survey 1 vs Survey 2";
-    els.volumeCurrentChip.textContent = "Survey 1 vs Survey 2";
-    els.volumeBaselineLabel.textContent = previewBaselineLabel || "Survey 1 vs Survey 2 height change analysis";
-    els.volumeCurrentLabel.textContent = previewCurrentLabel || "Survey 1 vs Survey 2 gain and loss classification";
-    els.volumeBaselineImage.src = previewBaselineImageSrc;
-    els.volumeBaselineImage.alt = `${area.label} ${baselineLabel} volume change context`;
-    els.volumeBaselineCaption.textContent = previewBaselineCaption || `${area.label} with the measured change overlay shown against the earlier survey context.`;
-    els.volumeCurrentImage.src = previewCurrentImageSrc;
-    els.volumeCurrentImage.alt = `${area.label} ${survey.label} volume change context`;
-    els.volumeCurrentCaption.textContent = previewCurrentCaption || `${area.label} with the measured change overlay shown against the later survey context.`;
-    els.volumeSummary.textContent = `${area.label} is being compared between ${baselineSurvey?.shortDate || baselineLabel} and ${survey.shortDate}. This trial now pairs the measured totals with a live 3D viewer and two flat reference maps so the change is easier to interpret from different angles.`;
-    els.volumeImageSummary.textContent = "These reference maps currently relate to Survey 1 vs Survey 2 only. The Survey 1 vs Survey 3 and Survey 2 vs Survey 3 slots are ready to be added here once those matching map sets have been prepared.";
-  } else {
-    renderVolumePolygonOverlay(els.volumeBaselineOverlay, baselineImageExists ? polygons : []);
-    renderVolumePolygonOverlay(els.volumeCurrentOverlay, currentImageExists ? polygons : []);
-    els.volumeBaselineChip.textContent = "Earlier aerial view";
-    els.volumeCurrentChip.textContent = "Later aerial view";
-    els.volumeBaselineLabel.textContent = baselineSurvey?.shortDate || "Earlier survey";
-    els.volumeCurrentLabel.textContent = survey.shortDate;
-    if (baselineImageExists) {
-      els.volumeBaselineImage.src = baselineImageSrc;
-      els.volumeBaselineImage.alt = `${area.label} ${baselineLabel} aerial view`;
-      els.volumeBaselineCaption.textContent = `${area.label} before the measured change. Use this to see the earlier sandbar shape and exposed ground pattern.`;
+    } else if (usePairedPreview) {
+      renderVolumeReferenceGallery(allReferenceMaps.length ? allReferenceMaps : [
+        {
+          eyebrow: previewBaselineLabel || "Height change analysis",
+          title: "Survey 1 vs Survey 2",
+          badge: "Comparison 1",
+          label: "Measured surface difference",
+          src: previewBaselineImageSrc,
+          alt: `${area.label} ${baselineLabel} volume change context`,
+          caption: previewBaselineCaption || `${area.label} with the measured change overlay shown against the earlier survey context.`
+        },
+        {
+          eyebrow: previewCurrentLabel || "Gain and loss classification",
+          title: "Survey 1 vs Survey 2",
+          badge: "Comparison 1",
+          label: "Simplified class view",
+          src: previewCurrentImageSrc,
+          alt: `${area.label} ${survey.label} volume change context`,
+          caption: previewCurrentCaption || `${area.label} with the measured change overlay shown against the later survey context.`
+        }
+      ]);
+      els.volumeSummary.textContent = `${area.label} is being compared between ${baselineSurvey?.shortDate || baselineLabel} and ${survey.shortDate}. This setup now pairs the measured totals with a live 3D viewer and all three flat comparison sets so the change is easier to interpret from different angles.`;
+      els.volumeImageSummary.textContent = "All three survey comparisons are shown together here: first the three height-change maps, then the three simpler gain-and-loss class maps. Click any one to open it full screen and zoom in.";
     } else {
-      els.volumeBaselineImage.removeAttribute("src");
-      els.volumeBaselineCaption.textContent = `No earlier aerial view is currently available for ${area.label}.`;
+      const beforeAfterCards = [];
+      if (baselineImageExists) {
+        beforeAfterCards.push({
+          eyebrow: "Earlier aerial view",
+          title: baselineSurvey?.shortDate || "Earlier survey",
+          badge: "Before",
+          label: area.label,
+          src: baselineImageSrc,
+          alt: `${area.label} ${baselineLabel} aerial view`,
+          caption: `${area.label} before the measured change. Use this to see the earlier sandbar shape and exposed ground pattern.`
+        });
+      }
+      if (currentImageExists) {
+        beforeAfterCards.push({
+          eyebrow: "Later aerial view",
+          title: survey.shortDate,
+          badge: "After",
+          label: area.label,
+          src: currentImageSrc,
+          alt: `${area.label} ${survey.label} aerial view`,
+          caption: `${area.label} during the later survey round. The figures below describe how this surface differs from the earlier one.`
+        });
+      }
+      renderVolumeReferenceGallery(beforeAfterCards);
+      if (!beforeAfterCards.length) {
+        renderVolumeReferenceGallery([]);
+      }
+      els.volumeSummary.textContent = `${survey.label} is being compared against ${baselineLabel} for ${area.label}. This view turns the measured surface change into a simple before-and-after sandbar story.`;
+      els.volumeImageSummary.textContent = "These aerial views give quick visual context for the same monitored area. The figures underneath explain how much material appears to have been added or removed.";
     }
-    if (currentImageExists) {
-      els.volumeCurrentImage.src = currentImageSrc;
-      els.volumeCurrentImage.alt = `${area.label} ${survey.label} aerial view`;
-      els.volumeCurrentCaption.textContent = `${area.label} during the later survey round. The figures below describe how this surface differs from the earlier one.`;
-    } else {
-      els.volumeCurrentImage.removeAttribute("src");
-      els.volumeCurrentCaption.textContent = `No later aerial view is currently available for ${area.label}.`;
-    }
-    els.volumeSummary.textContent = `${survey.label} is being compared against ${baselineLabel} for ${area.label}. This view turns the measured surface change into a simple before-and-after sandbar story.`;
-    els.volumeImageSummary.textContent = "These aerial views give quick visual context for the same monitored area. The figures underneath explain how much material appears to have been added or removed.";
-  }
   }
 
   els.volumeMetricGrid.innerHTML = hasConfiguredRows
@@ -3604,7 +3718,7 @@ async function renderVolume() {
       </div>
       <div class="volume-explainer__block">
         <strong>How to read it in order</strong>
-        <p>Start with the 3D viewer for detailed shape change, use the trend panel to see whether movement is repeating or reversing across the full survey set, then use the reference maps for a simpler plan-view check.</p>
+        <p>Start with the 3D viewer for detailed shape change, use the trend panel to see whether movement is repeating or reversing across the full survey set, then use the six reference maps for a simpler side-by-side plan-view check.</p>
       </div>
       <div class="volume-explainer__block">
         <strong>How the trend layer is built</strong>
@@ -3621,15 +3735,15 @@ async function renderVolume() {
     <div class="volume-explainer">
       <div class="volume-explainer__block">
         <strong>What is live right now</strong>
-        <p>The current live setup is strongest for Area 3 because that is where the three-round trend outputs, the hosted 3D viewer, and the first downloaded reference-map pair have all been lined up together.</p>
+        <p>The current live setup is strongest for Area 3 because that is where the three-round trend outputs, the hosted 3D viewer, and all three downloaded comparison map pairs have now been lined up together.</p>
       </div>
       <div class="volume-explainer__block">
         <strong>What the client should take from it</strong>
-        <p>The top half of the page explains where the estuary appears to be repeatedly building up, repeatedly lowering, or changing direction between rounds. The lower reference maps then give a simpler flat-view explanation for the first comparison pair.</p>
+        <p>The top half of the page explains where the estuary appears to be repeatedly building up, repeatedly lowering, or changing direction between rounds. The lower reference maps then let people compare Survey 1 vs 2, Survey 1 vs 3, and Survey 2 vs 3 side by side without leaving the page.</p>
       </div>
       <div class="volume-explainer__block">
         <strong>What comes next</strong>
-        <p>Survey 1 vs Survey 3 and Survey 2 vs Survey 3 can now be added into the same structure as soon as their matching reference maps are exported, without changing the layout again.</p>
+        <p>Any future areas can now use this same structure: 3D viewer at the top, trend summary in the middle, and a six-image comparison strip underneath with click-to-expand detail when needed.</p>
       </div>
     </div>
   `;
@@ -5095,7 +5209,56 @@ function trendPairSummaries(stats) {
   });
 }
 
+function renderVolumeReferenceGallery(cards, options = {}) {
+  const validCards = cards.filter((item) => item?.src);
+  const single = options.single ?? validCards.length === 1;
+  els.volumeImageryGrid.classList.toggle("volume-imagery-grid--single", single);
+  els.volumeImageryGrid.classList.toggle("volume-imagery-grid--gallery", validCards.length > 2);
+
+  if (!validCards.length) {
+    els.volumeImageryGrid.innerHTML = `
+      <article class="card">
+        <h3>Reference maps coming soon</h3>
+        <p class="muted">Once the exported imagery is in place, this section will show the comparison maps here.</p>
+      </article>
+    `;
+    return;
+  }
+
+  els.volumeImageryGrid.innerHTML = validCards.map((item) => `
+    <figure class="volume-reference-card">
+      <button
+        class="volume-reference-card__button"
+        type="button"
+        data-volume-lightbox-src="${escapeAttr(item.src)}"
+        data-volume-lightbox-eyebrow="${escapeAttr(item.eyebrow || "Reference map")}"
+        data-volume-lightbox-title="${escapeAttr(item.title || "Reference image")}"
+        data-volume-lightbox-caption="${escapeAttr(item.caption || "")}"
+        data-volume-lightbox-alt="${escapeAttr(item.alt || item.title || "Reference image")}"
+      >
+        <div class="volume-reference-stage">
+          <img src="${escapeAttr(item.src)}" alt="${escapeAttr(item.alt || item.title || "Reference image")}">
+        </div>
+      </button>
+      <figcaption class="volume-reference-card__meta">
+        <div class="volume-reference-card__copy">
+          <p class="eyebrow">${escapeHtml(item.eyebrow || "Reference map")}</p>
+          <strong>${escapeHtml(item.title || "Reference image")}</strong>
+          <p class="muted">${escapeHtml(item.caption || "")}</p>
+        </div>
+        <div class="volume-reference-card__badges">
+          ${item.badge ? `<span class="chip">${escapeHtml(item.badge)}</span>` : ""}
+          ${item.label ? `<span class="chip">${escapeHtml(item.label)}</span>` : ""}
+        </div>
+      </figcaption>
+    </figure>
+  `).join("");
+}
+
 function renderVolumeReferenceSelector(activeKey = "ab", availableKeys = []) {
+  if (!els.volumeReferenceSelector) {
+    return;
+  }
   const options = [
     { key: "ab", label: "Survey 1 vs Survey 2" },
     { key: "ac", label: "Survey 1 vs Survey 3" },
@@ -5120,22 +5283,22 @@ function comparisonReadinessCards(trendData, areaLabel) {
       key: "ab",
       label: "Survey 1 vs Survey 2",
       status: "Live now",
-      detail: "3D viewer, trend summary, and reference maps are all in place for this first comparison pair.",
+      detail: "3D viewer, trend summary, and both supporting reference maps are now in place for this first comparison pair.",
       note: pairSummaries[0]?.supportingCopy || "Reference maps loaded."
     },
     {
       key: "ac",
       label: "Survey 1 vs Survey 3",
-      status: "Comparison ready",
-      detail: `The longer-gap comparison is already summarised in the trend analysis above. The dedicated flat reference maps for ${areaLabel} can slot in here next.`,
-      note: pairSummaries[1]?.supportingCopy || "Waiting for reference maps."
+      status: "Live now",
+      detail: `The longer-gap comparison is now live as both a 3D view and a flat reference-map pair for ${areaLabel}.`,
+      note: pairSummaries[1]?.supportingCopy || "Reference maps loaded."
     },
     {
       key: "bc",
       label: "Survey 2 vs Survey 3",
-      status: "Comparison ready",
-      detail: `The short late-season comparison is also summarised above. The matching plan-view reference maps for ${areaLabel} can be added here as soon as they are exported.`,
-      note: pairSummaries[2]?.supportingCopy || "Waiting for reference maps."
+      status: "Live now",
+      detail: `The short late-season comparison is now live as both a 3D view and a flat reference-map pair for ${areaLabel}.`,
+      note: pairSummaries[2]?.supportingCopy || "Reference maps loaded."
     }
   ];
   return rollout.map((item) => `
@@ -6753,6 +6916,44 @@ function openSectionInsightOverlay(eyebrow, title, summary, body, allowHtml = fa
 function closeSectionInsightOverlay() {
   els.sectionInsightOverlay.classList.add("hidden");
   els.sectionInsightOverlay.setAttribute("aria-hidden", "true");
+}
+
+function openVolumeImageLightbox(eyebrow, title, caption, src, alt) {
+  if (!src || !els.volumeImageLightbox) {
+    return;
+  }
+  els.volumeImageLightboxEyebrow.textContent = eyebrow;
+  els.volumeImageLightboxTitle.textContent = title;
+  els.volumeImageLightboxCaption.textContent = caption;
+  els.volumeImageLightboxImage.src = src;
+  els.volumeImageLightboxImage.alt = alt;
+  els.volumeImageLightbox.classList.remove("hidden");
+  els.volumeImageLightbox.setAttribute("aria-hidden", "false");
+  document.body.classList.add("volume-lightbox-open");
+  setVolumeImageLightboxZoom(1);
+  els.volumeImageLightboxViewport.scrollTop = 0;
+  els.volumeImageLightboxViewport.scrollLeft = 0;
+}
+
+function closeVolumeImageLightbox() {
+  if (!els.volumeImageLightbox) {
+    return;
+  }
+  els.volumeImageLightbox.classList.add("hidden");
+  els.volumeImageLightbox.setAttribute("aria-hidden", "true");
+  els.volumeImageLightboxImage.removeAttribute("src");
+  document.body.classList.remove("volume-lightbox-open");
+  state.volumeLightboxZoom = 1;
+}
+
+function setVolumeImageLightboxZoom(value) {
+  const nextZoom = clamp(value, 1, 4);
+  state.volumeLightboxZoom = nextZoom;
+  if (!els.volumeImageLightboxImage) {
+    return;
+  }
+  els.volumeImageLightboxImage.style.width = `${nextZoom * 100}%`;
+  els.volumeImageLightboxImage.style.maxWidth = "none";
 }
 
 function fixed(value, digits) {

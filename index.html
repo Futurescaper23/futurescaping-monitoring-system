@@ -318,31 +318,7 @@
               <p id="volumeImageSummary" class="subtext muted"></p>
             </div>
           </div>
-            <div id="volumeReferenceSelector" class="volume-reference-selector section-gap"></div>
-            <div id="volumeImageryGrid" class="volume-imagery-grid section-gap">
-              <figure id="volumeBaselineCard" class="volume-image-card">
-                <div class="volume-image-card__head">
-                  <span id="volumeBaselineChip" class="chip">Baseline Aerial View</span>
-                  <strong id="volumeBaselineLabel"></strong>
-                </div>
-              <div class="volume-image-stage">
-                <img id="volumeBaselineImage" alt="">
-                <svg id="volumeBaselineOverlay" class="volume-image-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
-              </div>
-              <figcaption id="volumeBaselineCaption" class="muted section-gap"></figcaption>
-            </figure>
-              <figure id="volumeCurrentCard" class="volume-image-card">
-                <div class="volume-image-card__head">
-                  <span id="volumeCurrentChip" class="chip">Current Aerial View</span>
-                  <strong id="volumeCurrentLabel"></strong>
-                </div>
-              <div class="volume-image-stage">
-                <img id="volumeCurrentImage" alt="">
-                <svg id="volumeCurrentOverlay" class="volume-image-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
-              </div>
-              <figcaption id="volumeCurrentCaption" class="muted section-gap"></figcaption>
-            </figure>
-          </div>
+          <div id="volumeImageryGrid" class="volume-imagery-grid section-gap"></div>
         </article>
 
         <div class="two-col section-gap">
@@ -547,6 +523,28 @@
             </div>
             <p id="sectionInsightOverlaySummary" class="section-insight-overlay__summary muted"></p>
             <div id="sectionInsightOverlayBody" class="section-insight-overlay__body"></div>
+          </article>
+        </div>
+
+        <div id="volumeImageLightbox" class="volume-image-lightbox hidden" aria-hidden="true">
+          <div id="volumeImageLightboxBackdrop" class="volume-image-lightbox__backdrop"></div>
+          <article class="volume-image-lightbox__dialog" role="dialog" aria-modal="true" aria-labelledby="volumeImageLightboxTitle">
+            <div class="volume-image-lightbox__header">
+              <div>
+                <p id="volumeImageLightboxEyebrow" class="eyebrow">Reference map</p>
+                <h3 id="volumeImageLightboxTitle">Reference image</h3>
+                <p id="volumeImageLightboxCaption" class="muted"></p>
+              </div>
+              <div class="volume-image-lightbox__actions">
+                <button id="volumeImageLightboxZoomOut" class="chip" type="button" aria-label="Zoom out">-</button>
+                <button id="volumeImageLightboxReset" class="chip" type="button">Reset</button>
+                <button id="volumeImageLightboxZoomIn" class="chip" type="button" aria-label="Zoom in">+</button>
+                <button id="volumeImageLightboxClose" class="chip" type="button" aria-label="Close reference image">Close</button>
+              </div>
+            </div>
+            <div id="volumeImageLightboxViewport" class="volume-image-lightbox__viewport">
+              <img id="volumeImageLightboxImage" alt="">
+            </div>
           </article>
         </div>
       </section>
@@ -1055,7 +1053,7 @@
         if (window.location.protocol !== "file:") {
           const script = document.createElement("script");
           script.type = "module";
-          script.src = "./app.js?v=20260625a";
+          script.src = "./app.js?v=20260630a";
           document.body.appendChild(script);
           return;
         }
