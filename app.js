@@ -3263,7 +3263,16 @@ async function renderVolumePrevious() {
 
 async function renderVolume() {
   const project = currentProject();
-  const sandboxComparisonEntry = Object.entries(project.volumeChangeComparisons || {}).find(([, entry]) => entry?.areas?.[volumeChangeSettings.sandboxAreaId]);
+  const sandboxComparisonEntries = Object.entries(project.volumeChangeComparisons || {})
+    .filter(([, entry]) => entry?.areas?.[volumeChangeSettings.sandboxAreaId]);
+  const sandboxComparisonEntry = sandboxComparisonEntries.find(([surveyId]) => surveyId === state.surveyId)
+    || sandboxComparisonEntries
+      .sort((a, b) => {
+        const aIndex = project.surveys.findIndex((item) => item.id === a[0]);
+        const bIndex = project.surveys.findIndex((item) => item.id === b[0]);
+        return bIndex - aIndex;
+      })[0]
+    || null;
   const sandboxArea = areas().find((item) => item.id === volumeChangeSettings.sandboxAreaId) || currentArea();
   const area = sandboxArea;
   const survey = sandboxComparisonEntry
