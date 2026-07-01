@@ -520,24 +520,24 @@
           }
         },
         "2026-06-16": {
-          "baselineSurveyId": "2026-04-18",
+          "baselineSurveyId": "2026-03-22",
           "method": "Later survey ground surface compared with the earlier survey inside the fixed Area 3 change footprint",
           "cellSize": "Survey grid size 0.10 m with a reporting threshold of +/-0.05 m",
           "areas": {
             "area3": {
               "method": "Later survey ground surface compared with the earlier survey inside the fixed Area 3 change footprint",
               "cellSize": "Survey grid size 0.10 m with a reporting threshold of +/-0.05 m",
-              "notes": "Area 3 is the current pilot for the refocused change page. This live view now uses the latest repeat comparison between April and June alongside the three-round trend analysis.",
+              "notes": "Area 3 is the current pilot for the refocused change page. This live view now frames the story from the first March survey through to the latest June survey, with the intermediate April round feeding the wider three-round analysis underneath.",
               "previewMode": "pair",
               "previewBaselineImage": "area3_s2_vs_s3_height_change_analysis.png",
               "previewCurrentImage": "area3_s2_vs_s3_gain_loss_classification.png",
               "previewBaselineLabel": "Height change analysis",
               "previewCurrentLabel": "Gain and loss classification",
-              "previewBaselineCaption": "Plan-view height change surface for Area 3, showing where the June survey sits higher or lower than the April survey across the measured footprint.",
-              "previewCurrentCaption": "Simplified gain-and-loss classification for the April-to-June Area 3 comparison, useful as a quick client-facing reference image.",
+              "previewBaselineCaption": "Plan-view height change surface for Area 3, used here as part of the wider March-to-June story so people can see where the latest survey sits higher or lower within the measured footprint.",
+              "previewCurrentCaption": "Simplified gain-and-loss classification for the same Area 3 review, useful as a quick client-facing reference image inside the wider March-to-June story.",
               "viewerEmbedUrl": "https://hostedsite.vercel.app/?embed=1",
               "viewerTitle": "Area 3 3D Change Viewer",
-              "viewerSummary": "Interactive terrain preview for the Area 3 pilot comparison between 18-19 April 2026 and 16-17 June 2026. Use it with the measured totals and reference maps to inspect where sediment appears to have built up or lowered.",
+              "viewerSummary": "Interactive terrain preview for the Area 3 pilot story between 22-23 March 2026 and 16-17 June 2026. Use it with the measured totals and reference maps to inspect where sediment appears to have built up or lowered across the wider monitoring window.",
               "viewerStats": {
                 "analysedArea": "164,653 m2",
                 "gainArea": "79,834 m2",
