@@ -16,7 +16,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
 const TIDE_LATITUDE = environmentalContext.tide.latitude;
 const TIDE_LONGITUDE = environmentalContext.tide.longitude;
-const ACCESS_USERS_PATH = path.join(__dirname, "data", "access-users.json");
+const ACCESS_USERS_PATH = resolveAccessUsersPath(process.env.ACCESS_USERS_PATH || "./data/access-users.json");
 const LOGIN_PAGE_PATH = path.join(__dirname, "login.html");
 const SESSION_COOKIE_NAME = "fsm_session";
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 12;
@@ -703,7 +703,15 @@ function serveLoginPage(response) {
   fs.createReadStream(LOGIN_PAGE_PATH).pipe(response);
 }
 
+function resolveAccessUsersPath(rawPath) {
+  if (path.isAbsolute(rawPath)) {
+    return rawPath;
+  }
+  return path.resolve(__dirname, rawPath);
+}
+
 function ensureAccessUsersStore() {
+  fs.mkdirSync(path.dirname(ACCESS_USERS_PATH), { recursive: true });
   if (!fs.existsSync(ACCESS_USERS_PATH)) {
     fs.writeFileSync(ACCESS_USERS_PATH, JSON.stringify({ users: [] }, null, 2));
   }
