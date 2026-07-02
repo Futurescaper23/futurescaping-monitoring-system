@@ -1,6 +1,7 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { areaSettings, assetSettings } from "./src/data/areas.js";
 import { environmentalContext } from "./src/data/environmentalContext.js";
@@ -12,8 +13,14 @@ const __dirname = path.dirname(__filename);
 const port = Number(process.env.PORT || 3080);
 const WORLDTIDES_API_KEY = process.env.WORLDTIDES_API_KEY;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
 const TIDE_LATITUDE = environmentalContext.tide.latitude;
 const TIDE_LONGITUDE = environmentalContext.tide.longitude;
+const ACCESS_USERS_PATH = path.join(__dirname, "data", "access-users.json");
+const LOGIN_PAGE_PATH = path.join(__dirname, "login.html");
+const SESSION_COOKIE_NAME = "fsm_session";
+const SESSION_DURATION_MS = 1000 * 60 * 60 * 12;
+const sessions = new Map();
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -27,36 +34,94 @@ const mimeTypes = {
   ".csv": "text/csv; charset=utf-8"
 };
 
+ensureAccessUsersStore();
+
 http.createServer(async (request, response) => {
   const url = new URL(request.url, `http://${request.headers.host}`);
+  const session = getSessionFromRequest(request);
+
+  if (request.method === "GET" && url.pathname === "/login") {
+    if (session) {
+      response.writeHead(302, { Location: "/" });
+      response.end();
+      return;
+    }
+    serveLoginPage(response);
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/site-auth/login") {
+    await handleSiteAuthLoginRequest(request, response);
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/site-auth/logout") {
+    await handleSiteAuthLogoutRequest(request, response, session);
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/site-auth/session") {
+    handleSiteAuthSessionRequest(response, session);
+    return;
+  }
+
+  if (!session) {
+    if (url.pathname.startsWith("/api/")) {
+      sendJson(response, 401, { error: "Sign-in required." });
+      return;
+    }
+    response.writeHead(302, { Location: "/login" });
+    response.end();
+    return;
+  }
 
   if (request.method === "POST" && url.pathname === "/api/upload") {
-    await handleUploadRequest(request, response);
+    await handleUploadRequest(request, response, session);
     return;
   }
 
   if (request.method === "POST" && url.pathname === "/api/surveys/create") {
-    await handleSurveyCreateRequest(request, response);
+    await handleSurveyCreateRequest(request, response, session);
     return;
   }
 
   if (request.method === "POST" && url.pathname === "/api/admin-auth") {
-    await handleAdminAuthRequest(request, response);
+    await handleAdminAuthRequest(request, response, session);
     return;
   }
 
   if (request.method === "POST" && url.pathname === "/api/survey-area-metadata") {
-    await handleSurveyAreaMetadataRequest(request, response);
+    await handleSurveyAreaMetadataRequest(request, response, session);
     return;
   }
 
   if (request.method === "POST" && url.pathname === "/api/survey-area-metadata/reset") {
-    await handleSurveyAreaMetadataResetRequest(request, response);
+    await handleSurveyAreaMetadataResetRequest(request, response, session);
     return;
   }
 
   if (request.method === "POST" && url.pathname === "/api/volume-change") {
-    await handleVolumeChangeRequest(request, response);
+    await handleVolumeChangeRequest(request, response, session);
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/access-users") {
+    await handleAccessUsersListRequest(response, session);
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/access-users") {
+    await handleAccessUsersCreateRequest(request, response, session);
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/access-users/update") {
+    await handleAccessUsersUpdateRequest(request, response, session);
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/access-users/delete") {
+    await handleAccessUsersDeleteRequest(request, response, session);
     return;
   }
 
@@ -87,8 +152,11 @@ http.createServer(async (request, response) => {
   console.log(`FutureScaping monitoring system running at http://localhost:${port}`);
 });
 
-async function handleUploadRequest(request, response) {
+async function handleUploadRequest(request, response, session) {
   try {
+    if (!requireAdminSession(response, session)) {
+      return;
+    }
     const body = await readJsonBody(request);
     const { projectId, surveyId, areaId, fileName, contentBase64 } = body;
 
@@ -125,8 +193,11 @@ async function handleUploadRequest(request, response) {
   }
 }
 
-async function handleSurveyCreateRequest(request, response) {
+async function handleSurveyCreateRequest(request, response, session) {
   try {
+    if (!requireAdminSession(response, session)) {
+      return;
+    }
     const body = await readJsonBody(request);
     const { projectId, name, dateFrom, dateTo, comparisonBaseline } = body;
 
@@ -187,8 +258,11 @@ async function handleSurveyCreateRequest(request, response) {
   }
 }
 
-async function handleSurveyAreaMetadataRequest(request, response) {
+async function handleSurveyAreaMetadataRequest(request, response, session) {
   try {
+    if (!requireAdminSession(response, session)) {
+      return;
+    }
     const body = await readJsonBody(request);
     const { projectId, surveyId, areaId, fields } = body;
 
@@ -262,8 +336,11 @@ async function handleSurveyAreaMetadataRequest(request, response) {
   }
 }
 
-async function handleSurveyAreaMetadataResetRequest(request, response) {
+async function handleSurveyAreaMetadataResetRequest(request, response, session) {
   try {
+    if (!requireAdminSession(response, session)) {
+      return;
+    }
     const body = await readJsonBody(request);
     const { projectId, surveyId, areaId } = body;
 
@@ -294,8 +371,11 @@ async function handleSurveyAreaMetadataResetRequest(request, response) {
   }
 }
 
-async function handleVolumeChangeRequest(request, response) {
+async function handleVolumeChangeRequest(request, response, session) {
   try {
+    if (!requireAdminSession(response, session)) {
+      return;
+    }
     const body = await readJsonBody(request);
     const { projectId, surveyId, areaId, method, cellSize, notes, polygons } = body;
 
@@ -360,8 +440,12 @@ async function handleVolumeChangeRequest(request, response) {
   }
 }
 
-async function handleAdminAuthRequest(request, response) {
+async function handleAdminAuthRequest(request, response, session) {
   try {
+    if (!session) {
+      sendJson(response, 401, { error: "Sign-in required." });
+      return;
+    }
     if (!ADMIN_PASSWORD) {
       sendJson(response, 500, { error: "Server configuration error: ADMIN_PASSWORD is not set." });
       return;
@@ -379,10 +463,369 @@ async function handleAdminAuthRequest(request, response) {
       return;
     }
 
-    sendJson(response, 200, { ok: true });
+    session.isAdmin = true;
+    sendJson(response, 200, {
+      ok: true,
+      users: sanitiseAccessUsers(loadAccessUsers())
+    });
   } catch (error) {
     sendJson(response, 500, { error: error.message });
   }
+}
+
+async function handleSiteAuthLoginRequest(request, response) {
+  try {
+    const body = await readJsonBody(request);
+    const username = String(body.username || "").trim();
+    const password = String(body.password || "");
+
+    if (!username || !password) {
+      sendJson(response, 400, { error: "Username and password are required." });
+      return;
+    }
+
+    const adminLoginMatch = ADMIN_PASSWORD && username.toLowerCase() === ADMIN_USERNAME.toLowerCase() && password === ADMIN_PASSWORD;
+    let authUser = null;
+
+    if (adminLoginMatch) {
+      authUser = {
+        id: "admin-master",
+        username: ADMIN_USERNAME,
+        label: "Admin master access",
+        expiresAt: null,
+        isMaster: true
+      };
+    } else {
+      const users = loadAccessUsers();
+      const matched = users.find((item) => item.username.toLowerCase() === username.toLowerCase());
+      if (!matched || !matched.active) {
+        sendJson(response, 401, { error: "Incorrect username or password." });
+        return;
+      }
+      if (matched.expiresAt && Date.parse(matched.expiresAt) <= Date.now()) {
+        sendJson(response, 401, { error: "This login has expired." });
+        return;
+      }
+      if (!verifyPassword(password, matched)) {
+        sendJson(response, 401, { error: "Incorrect username or password." });
+        return;
+      }
+      authUser = {
+        id: matched.id,
+        username: matched.username,
+        label: matched.label || matched.username,
+        expiresAt: matched.expiresAt || null,
+        isMaster: false
+      };
+    }
+
+    const sessionId = crypto.randomUUID();
+    const sessionExpiresAt = authUser.expiresAt
+      ? Math.min(Date.parse(authUser.expiresAt), Date.now() + SESSION_DURATION_MS)
+      : Date.now() + SESSION_DURATION_MS;
+    sessions.set(sessionId, {
+      id: sessionId,
+      userId: authUser.id,
+      username: authUser.username,
+      label: authUser.label,
+      expiresAt: sessionExpiresAt,
+      accessExpiresAt: authUser.expiresAt,
+      isMaster: authUser.isMaster,
+      isAdmin: authUser.isMaster
+    });
+
+    sendJson(
+      response,
+      200,
+      {
+        ok: true,
+        user: {
+          username: authUser.username,
+          label: authUser.label,
+          expiresAt: authUser.expiresAt
+        }
+      },
+      {
+        "Set-Cookie": buildSessionCookie(sessionId, sessionExpiresAt, request)
+      }
+    );
+  } catch (error) {
+    sendJson(response, 500, { error: error.message });
+  }
+}
+
+async function handleSiteAuthLogoutRequest(request, response, session) {
+  if (session) {
+    sessions.delete(session.id);
+  }
+  sendJson(
+    response,
+    200,
+    { ok: true },
+    {
+      "Set-Cookie": clearSessionCookie(request)
+    }
+  );
+}
+
+function handleSiteAuthSessionRequest(response, session) {
+  if (!session) {
+    sendJson(response, 200, { authenticated: false });
+    return;
+  }
+  sendJson(response, 200, {
+    authenticated: true,
+    user: {
+      username: session.username,
+      label: session.label,
+      expiresAt: session.accessExpiresAt || null,
+      isAdmin: Boolean(session.isAdmin)
+    }
+  });
+}
+
+async function handleAccessUsersListRequest(response, session) {
+  if (!requireAdminSession(response, session)) {
+    return;
+  }
+  sendJson(response, 200, {
+    users: sanitiseAccessUsers(loadAccessUsers())
+  });
+}
+
+async function handleAccessUsersCreateRequest(request, response, session) {
+  try {
+    if (!requireAdminSession(response, session)) {
+      return;
+    }
+    const body = await readJsonBody(request);
+    const username = String(body.username || "").trim();
+    const password = String(body.password || "");
+    const label = String(body.label || "").trim() || username;
+    const notes = String(body.notes || "").trim();
+    const expiresAt = normaliseExpiry(body.expiresAt);
+    const active = body.active !== false;
+
+    if (!username || !password) {
+      sendJson(response, 400, { error: "Username and password are required." });
+      return;
+    }
+
+    const users = loadAccessUsers();
+    if (users.some((item) => item.username.toLowerCase() === username.toLowerCase())) {
+      sendJson(response, 409, { error: "That username already exists." });
+      return;
+    }
+
+    users.push({
+      id: crypto.randomUUID(),
+      username,
+      label,
+      notes,
+      expiresAt,
+      active,
+      ...hashPassword(password),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+
+    saveAccessUsers(users);
+    sendJson(response, 200, { users: sanitiseAccessUsers(users) });
+  } catch (error) {
+    sendJson(response, 500, { error: error.message });
+  }
+}
+
+async function handleAccessUsersUpdateRequest(request, response, session) {
+  try {
+    if (!requireAdminSession(response, session)) {
+      return;
+    }
+    const body = await readJsonBody(request);
+    const id = String(body.id || "").trim();
+    if (!id) {
+      sendJson(response, 400, { error: "User id is required." });
+      return;
+    }
+
+    const users = loadAccessUsers();
+    const user = users.find((item) => item.id === id);
+    if (!user) {
+      sendJson(response, 404, { error: "User not found." });
+      return;
+    }
+
+    if (typeof body.label !== "undefined") {
+      user.label = String(body.label || "").trim() || user.username;
+    }
+    if (typeof body.notes !== "undefined") {
+      user.notes = String(body.notes || "").trim();
+    }
+    if (typeof body.active !== "undefined") {
+      user.active = body.active !== false;
+    }
+    if (typeof body.expiresAt !== "undefined") {
+      user.expiresAt = normaliseExpiry(body.expiresAt);
+    }
+    if (body.password) {
+      Object.assign(user, hashPassword(String(body.password)));
+    }
+    user.updatedAt = new Date().toISOString();
+
+    saveAccessUsers(users);
+    sendJson(response, 200, { users: sanitiseAccessUsers(users) });
+  } catch (error) {
+    sendJson(response, 500, { error: error.message });
+  }
+}
+
+async function handleAccessUsersDeleteRequest(request, response, session) {
+  try {
+    if (!requireAdminSession(response, session)) {
+      return;
+    }
+    const body = await readJsonBody(request);
+    const id = String(body.id || "").trim();
+    if (!id) {
+      sendJson(response, 400, { error: "User id is required." });
+      return;
+    }
+    const users = loadAccessUsers().filter((item) => item.id !== id);
+    saveAccessUsers(users);
+    sendJson(response, 200, { users: sanitiseAccessUsers(users) });
+  } catch (error) {
+    sendJson(response, 500, { error: error.message });
+  }
+}
+
+function serveLoginPage(response) {
+  response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+  fs.createReadStream(LOGIN_PAGE_PATH).pipe(response);
+}
+
+function ensureAccessUsersStore() {
+  if (!fs.existsSync(ACCESS_USERS_PATH)) {
+    fs.writeFileSync(ACCESS_USERS_PATH, JSON.stringify({ users: [] }, null, 2));
+  }
+}
+
+function loadAccessUsers() {
+  ensureAccessUsersStore();
+  const payload = JSON.parse(fs.readFileSync(ACCESS_USERS_PATH, "utf8"));
+  return Array.isArray(payload?.users) ? payload.users : [];
+}
+
+function saveAccessUsers(users) {
+  fs.writeFileSync(ACCESS_USERS_PATH, JSON.stringify({ users }, null, 2));
+}
+
+function sanitiseAccessUsers(users) {
+  return users
+    .slice()
+    .sort((a, b) => String(a.username).localeCompare(String(b.username)))
+    .map((user) => ({
+      id: user.id,
+      username: user.username,
+      label: user.label || user.username,
+      notes: user.notes || "",
+      active: user.active !== false,
+      expiresAt: user.expiresAt || null,
+      createdAt: user.createdAt || null,
+      updatedAt: user.updatedAt || null,
+      expired: Boolean(user.expiresAt && Date.parse(user.expiresAt) <= Date.now())
+    }));
+}
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+  return { passwordSalt: salt, passwordHash: hash };
+}
+
+function verifyPassword(password, user) {
+  if (!user?.passwordSalt || !user?.passwordHash) {
+    return false;
+  }
+  const expected = Buffer.from(user.passwordHash, "hex");
+  const actual = crypto.scryptSync(password, user.passwordSalt, expected.length);
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+}
+
+function normaliseExpiry(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return null;
+  }
+  const parsed = Date.parse(text);
+  if (!Number.isFinite(parsed)) {
+    throw new Error("Expiry must be a valid date and time.");
+  }
+  return new Date(parsed).toISOString();
+}
+
+function getSessionFromRequest(request) {
+  cleanupExpiredSessions();
+  const cookies = parseCookies(request.headers.cookie || "");
+  const sessionId = cookies[SESSION_COOKIE_NAME];
+  if (!sessionId) {
+    return null;
+  }
+  const session = sessions.get(sessionId);
+  if (!session) {
+    return null;
+  }
+  if (session.expiresAt <= Date.now()) {
+    sessions.delete(sessionId);
+    return null;
+  }
+  return session;
+}
+
+function cleanupExpiredSessions() {
+  const now = Date.now();
+  for (const [id, session] of sessions.entries()) {
+    if (session.expiresAt <= now) {
+      sessions.delete(id);
+    }
+  }
+}
+
+function parseCookies(rawCookie) {
+  return rawCookie.split(";").reduce((acc, part) => {
+    const [name, ...rest] = part.trim().split("=");
+    if (!name) {
+      return acc;
+    }
+    acc[name] = decodeURIComponent(rest.join("="));
+    return acc;
+  }, {});
+}
+
+function buildSessionCookie(sessionId, expiresAt, request) {
+  const secure = isSecureRequest(request) ? "; Secure" : "";
+  const maxAgeSeconds = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+  return `${SESSION_COOKIE_NAME}=${encodeURIComponent(sessionId)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure}`;
+}
+
+function clearSessionCookie(request) {
+  const secure = isSecureRequest(request) ? "; Secure" : "";
+  return `${SESSION_COOKIE_NAME}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0${secure}`;
+}
+
+function isSecureRequest(request) {
+  return request.socket.encrypted || String(request.headers["x-forwarded-proto"] || "").toLowerCase() === "https";
+}
+
+function requireAdminSession(response, session) {
+  if (!session) {
+    sendJson(response, 401, { error: "Sign-in required." });
+    return false;
+  }
+  if (!session.isAdmin) {
+    sendJson(response, 403, { error: "Admin access required." });
+    return false;
+  }
+  return true;
 }
 
 function writeManifest(manifestPath, projectId, surveyId, areaId, areaDir) {
@@ -463,9 +906,10 @@ function readJsonBody(request) {
   });
 }
 
-function sendJson(response, statusCode, payload) {
+function sendJson(response, statusCode, payload, headers = {}) {
   response.writeHead(statusCode, {
-    "Content-Type": "application/json; charset=utf-8"
+    "Content-Type": "application/json; charset=utf-8",
+    ...headers
   });
   response.end(JSON.stringify(payload));
 }

@@ -67,7 +67,8 @@ import { volumeChangeSettings } from "./src/data/volumeChange.js?v=20260529g";
   sectionTrackCache: new Map(),
   sectionArea: null,
   sectionComparisonSnapshot: null,
-  volumeLightboxZoom: 1
+  volumeLightboxZoom: 1,
+  accessUsers: []
     };
 
 const VALID_TABS = new Set(projectConfig.navigation.tabs);
@@ -583,10 +584,20 @@ const els = {
   adminUploadStatus: byId("adminUploadStatus"),
   adminBoardSummary: byId("adminBoardSummary"),
   adminBoardGrid: byId("adminBoardGrid"),
+  accessLabelInput: byId("accessLabelInput"),
+  accessUsernameInput: byId("accessUsernameInput"),
+  accessPasswordInput: byId("accessPasswordInput"),
+  accessExpiresAtInput: byId("accessExpiresAtInput"),
+  accessNotesInput: byId("accessNotesInput"),
+  createAccessUserBtn: byId("createAccessUserBtn"),
+  accessUserStatus: byId("accessUserStatus"),
+  accessUsersSummary: byId("accessUsersSummary"),
+  accessUsersGrid: byId("accessUsersGrid"),
   workflowGrid: byId("workflowGrid"),
   tabs: byId("tabs"),
   backToTopBtn: byId("backToTopBtn"),
-  adminModeToggle: byId("adminModeToggle")
+  adminModeToggle: byId("adminModeToggle"),
+  signOutBtn: byId("signOutBtn")
 };
 
 bootstrap().catch((error) => {
@@ -597,8 +608,9 @@ bootstrap().catch((error) => {
 async function bootstrap() {
   state.dataset = await loadProjectDataset();
   const requestedAdminMode = new URLSearchParams(window.location.search).get("admin") === "1" || window.localStorage.getItem("fsm-admin-mode") === "1";
-  state.adminMode = adminToolsEnabled() && requestedAdminMode;
-  if (!adminToolsEnabled()) {
+  const siteSession = await loadSiteSession();
+  state.adminMode = adminToolsEnabled() && requestedAdminMode && Boolean(siteSession?.user?.isAdmin);
+  if (!adminToolsEnabled() || !siteSession?.user?.isAdmin) {
     window.localStorage.removeItem("fsm-admin-mode");
   }
   state.projectId = state.dataset.projects[0].id;
@@ -612,6 +624,14 @@ async function bootstrap() {
   applyUrlState();
   bindEvents();
   renderAll();
+}
+
+async function loadSiteSession() {
+  const response = await fetch("/api/site-auth/session");
+  if (!response.ok) {
+    return { authenticated: false };
+  }
+  return response.json().catch(() => ({ authenticated: false }));
 }
 
 async function loadProjectDataset() {
@@ -961,8 +981,28 @@ function bindEvents() {
     saveVolumeChange();
   });
 
+  els.createAccessUserBtn?.addEventListener("click", () => {
+    createAccessUser();
+  });
+
+  els.accessUsersGrid?.addEventListener("click", (event) => {
+    const updateButton = event.target.closest("[data-access-update]");
+    if (updateButton) {
+      updateAccessUser(updateButton.dataset.accessUpdate);
+      return;
+    }
+    const deleteButton = event.target.closest("[data-access-delete]");
+    if (deleteButton) {
+      deleteAccessUser(deleteButton.dataset.accessDelete);
+    }
+  });
+
   els.adminModeToggle.addEventListener("click", () => {
     toggleAdminMode();
+  });
+
+  els.signOutBtn?.addEventListener("click", () => {
+    signOut();
   });
 
   els.zoomInBtn.addEventListener("click", () => zoom(1.15));
@@ -3764,6 +3804,13 @@ async function renderAdmin() {
   const project = currentProject();
   const survey = currentSurvey();
   const area = currentArea();
+  if (!state.accessUsers.length) {
+    try {
+      await refreshAccessUsers();
+    } catch (error) {
+      els.accessUserStatus.innerHTML = detail("Report logins", error.message);
+    }
+  }
   const areaHasOverride = Boolean(areaOverride(project, survey.id, area.id) && Object.keys(areaOverride(project, survey.id, area.id)).length);
   const volumeDataset = project.volumeChangeComparisons?.[survey.id]?.areas?.[area.id] || null;
   fillSelect(
@@ -3848,6 +3895,8 @@ async function renderAdmin() {
       activateTab("admin");
     });
   });
+
+  renderAccessUsersAdmin();
 }
 
 function updateArea(areaId) {
@@ -6816,7 +6865,7 @@ function syncAdminVisibility() {
   document.querySelectorAll("[data-admin-only='true']").forEach((item) => {
     item.classList.toggle("hidden", !canShowAdmin);
   });
-  els.adminModeToggle.classList.toggle("hidden", !adminToolsEnabled() || (!isLocalHost() && !state.adminMode));
+  els.adminModeToggle.classList.toggle("hidden", !adminToolsEnabled());
   els.adminModeToggle.textContent = state.adminMode ? "Close Admin Console" : "Open Admin Console";
   if (!canShowAdmin && state.activeTab === "admin") {
     activateTab("overview");
@@ -6864,8 +6913,182 @@ async function toggleAdminMode() {
 
   state.adminMode = true;
   window.localStorage.setItem("fsm-admin-mode", "1");
+  state.accessUsers = payload.users || [];
   syncAdminVisibility();
   activateTab("admin");
+}
+
+function renderAccessUsersAdmin() {
+  const users = Array.isArray(state.accessUsers) ? state.accessUsers.slice() : [];
+  const activeUsers = users.filter((item) => item.active && !item.expired);
+  const expiringSoon = activeUsers.filter((item) => item.expiresAt && (Date.parse(item.expiresAt) - Date.now()) <= (1000 * 60 * 60 * 24 * 7));
+  const expiredUsers = users.filter((item) => item.expired);
+
+  els.accessUsersSummary.innerHTML = [
+    metric("Active logins", String(activeUsers.length), "Can still open the report"),
+    metric("Expiring within 7 days", String(expiringSoon.length), "Worth checking before they lock out"),
+    metric("Expired logins", String(expiredUsers.length), "No longer usable"),
+    metric("Total saved", String(users.length), "Permanent and temporary logins")
+  ].join("");
+
+  if (!users.length) {
+    els.accessUsersGrid.innerHTML = `
+      <article class="card">
+        <h3>No saved report logins yet</h3>
+        <p>Create the harbour login or a temporary contractor login above. You can always sign in yourself with the admin username and admin password.</p>
+      </article>
+    `;
+    return;
+  }
+
+  els.accessUsersGrid.innerHTML = users.map((user) => {
+    const expiresDisplay = user.expiresAt
+      ? new Date(user.expiresAt).toLocaleString("en-GB")
+      : "No expiry";
+    const statusLabel = user.expired
+      ? "Expired"
+      : (user.active ? "Active" : "Disabled");
+    return `
+      <article class="card admin-access-card" data-access-card="${escapeAttr(user.id)}">
+        <div class="admin-board-meta">
+          <span class="chip">${escapeHtml(user.label || user.username)}</span>
+          <span class="chip">${escapeHtml(statusLabel)}</span>
+        </div>
+        <div class="admin-grid section-gap">
+          <label>Label<input type="text" data-access-field="label" value="${escapeAttr(user.label || user.username)}"></label>
+          <label>Username<input type="text" value="${escapeAttr(user.username)}" disabled></label>
+          <label>Password reset<input type="text" data-access-field="password" placeholder="Leave blank to keep current"></label>
+          <label>Expires at<input type="datetime-local" data-access-field="expiresAt" value="${escapeAttr(datetimeLocalValue(user.expiresAt))}"></label>
+          <label class="admin-span-2">Notes<textarea data-access-field="notes" placeholder="Notes for this login">${escapeHtml(user.notes || "")}</textarea></label>
+          <label><input type="checkbox" data-access-field="active" ${user.active ? "checked" : ""}> Active</label>
+        </div>
+        <p class="muted">Current expiry: ${escapeHtml(expiresDisplay)}</p>
+        <div class="admin-actions">
+          <button class="area-action" type="button" data-access-update="${escapeAttr(user.id)}">Save Login</button>
+          <button class="chip" type="button" data-access-delete="${escapeAttr(user.id)}">Delete Login</button>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+async function refreshAccessUsers(statusCopy = "") {
+  const response = await fetch("/api/access-users");
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "Could not load report logins.");
+  }
+  state.accessUsers = payload.users || [];
+  renderAccessUsersAdmin();
+  if (statusCopy) {
+    els.accessUserStatus.innerHTML = detail("Report logins", statusCopy);
+  }
+}
+
+async function createAccessUser() {
+  const username = els.accessUsernameInput.value.trim();
+  const password = els.accessPasswordInput.value;
+  const label = els.accessLabelInput.value.trim();
+  const expiresAt = els.accessExpiresAtInput.value.trim();
+  const notes = els.accessNotesInput.value.trim();
+
+  if (!username || !password) {
+    els.accessUserStatus.innerHTML = detail("Report logins", "Add at least a username and password before creating a login.");
+    return;
+  }
+
+  els.accessUserStatus.innerHTML = detail("Report logins", `Creating login ${username}...`);
+  const response = await fetch("/api/access-users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password, label, expiresAt, notes, active: true })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    els.accessUserStatus.innerHTML = detail("Report logins", payload.error || "Could not create the report login.");
+    return;
+  }
+
+  els.accessLabelInput.value = "";
+  els.accessUsernameInput.value = "";
+  els.accessPasswordInput.value = "";
+  els.accessExpiresAtInput.value = "";
+  els.accessNotesInput.value = "";
+  state.accessUsers = payload.users || [];
+  renderAccessUsersAdmin();
+  els.accessUserStatus.innerHTML = detail("Report logins", "New report login created.");
+}
+
+async function updateAccessUser(userId) {
+  const card = els.accessUsersGrid.querySelector(`[data-access-card="${CSS.escape(userId)}"]`);
+  if (!card) {
+    return;
+  }
+
+  const payload = {
+    id: userId,
+    label: card.querySelector('[data-access-field="label"]')?.value.trim() || "",
+    password: card.querySelector('[data-access-field="password"]')?.value || "",
+    expiresAt: card.querySelector('[data-access-field="expiresAt"]')?.value.trim() || "",
+    notes: card.querySelector('[data-access-field="notes"]')?.value.trim() || "",
+    active: Boolean(card.querySelector('[data-access-field="active"]')?.checked)
+  };
+
+  els.accessUserStatus.innerHTML = detail("Report logins", "Saving login changes...");
+  const response = await fetch("/api/access-users/update", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    els.accessUserStatus.innerHTML = detail("Report logins", body.error || "Could not save login changes.");
+    return;
+  }
+
+  state.accessUsers = body.users || [];
+  renderAccessUsersAdmin();
+  els.accessUserStatus.innerHTML = detail("Report logins", "Login updated.");
+}
+
+async function deleteAccessUser(userId) {
+  if (!window.confirm("Delete this report login?")) {
+    return;
+  }
+
+  els.accessUserStatus.innerHTML = detail("Report logins", "Deleting login...");
+  const response = await fetch("/api/access-users/delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: userId })
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    els.accessUserStatus.innerHTML = detail("Report logins", body.error || "Could not delete the report login.");
+    return;
+  }
+
+  state.accessUsers = body.users || [];
+  renderAccessUsersAdmin();
+  els.accessUserStatus.innerHTML = detail("Report logins", "Login deleted.");
+}
+
+async function signOut() {
+  await fetch("/api/site-auth/logout", { method: "POST" }).catch(() => null);
+  window.localStorage.removeItem("fsm-admin-mode");
+  window.location.href = "/login";
+}
+
+function datetimeLocalValue(value) {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const pad = (part) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function capitalise(value) {
