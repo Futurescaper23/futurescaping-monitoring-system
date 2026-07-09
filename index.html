@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>FutureScaping Estuary Monitoring System</title>
+    <title>Padstow Estuary Monitoring System</title>
     <meta name="description" content="Live estuary survey dashboard for aerial imagery, section profiles, tide context, survey notes, and sandbar change monitoring.">
     <link rel="canonical" href="https://future-monitoring-system.onrender.com/">
     <link rel="icon" type="image/svg+xml" href="./favicon.svg">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="FutureScaping">
     <meta property="og:url" content="https://future-monitoring-system.onrender.com/">
-    <meta property="og:title" content="FutureScaping Estuary Monitoring">
+    <meta property="og:title" content="Padstow Estuary Monitoring System">
     <meta property="og:description" content="Live survey dashboard for estuary imagery, section profiles, tide context, and sandbar change monitoring.">
     <meta property="og:image" content="https://future-monitoring-system.onrender.com/social-preview.png?v=20260510">
     <meta property="og:image:secure_url" content="https://future-monitoring-system.onrender.com/social-preview.png?v=20260510">
@@ -18,7 +18,7 @@
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="FutureScaping Estuary Monitoring">
+    <meta name="twitter:title" content="Padstow Estuary Monitoring System">
     <meta name="twitter:description" content="Live survey dashboard for estuary imagery, section profiles, tide context, and sandbar change monitoring.">
     <meta name="twitter:image" content="https://future-monitoring-system.onrender.com/social-preview.png?v=20260510">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -38,7 +38,7 @@
             </div>
             <div class="shell-brand__wordmark">
               <p class="shell-brand__name">FutureScaping</p>
-              <p class="shell-brand__sub">Labs</p>
+              <p class="shell-brand__sub">Monitoring</p>
             </div>
           </div>
           <div class="shell-project-meta">
@@ -111,7 +111,7 @@
               <span></span>
             </div>
             <div class="shell-stagebar__brandword">
-              <p class="shell-stagebar__brandname">FutureScaping Labs</p>
+              <p class="shell-stagebar__brandname">Padstow Estuary Monitoring</p>
             </div>
           </div>
           <p id="shellStageEyebrow" class="eyebrow">Monitoring View</p>
@@ -268,6 +268,7 @@
               <p id="volumeSummary" class="subtext muted"></p>
             </div>
           </div>
+          <div id="volumeQuickAreas" class="chips section-gap"></div>
           <div id="volumeSandboxBanner" class="notice-banner section-gap"></div>
           <div id="volumeMetricGrid" class="stats-grid section-gap"></div>
         </article>
@@ -304,13 +305,13 @@
             <div>
               <p class="eyebrow">Trend Analysis</p>
               <h2>What Is Repeating Over Time</h2>
-              <p class="subtext muted">This brings all three survey rounds together so people can see what is steadily building up, steadily lowering, reversing, or settling down across Area 3.</p>
+              <p id="volumeTrendIntro" class="subtext muted">This brings all three survey rounds together so people can see what is steadily building up, steadily lowering, reversing, or settling down across the current live monitoring area.</p>
             </div>
           </div>
           <div id="volumeTrendBody" class="section-gap"></div>
         </article>
 
-        <article class="panel section-gap">
+        <article id="volumeReferencePanel" class="panel section-gap">
           <div class="panel-head">
             <div>
               <p class="eyebrow">Supporting Imagery</p>
@@ -321,7 +322,7 @@
           <div id="volumeImageryGrid" class="volume-imagery-grid section-gap"></div>
         </article>
 
-        <div class="two-col section-gap">
+        <div id="volumeGuidancePanels" class="two-col section-gap">
           <article class="panel">
             <p class="eyebrow">How To Read This Page</p>
             <h2>Current Workflow</h2>
@@ -334,7 +335,7 @@
           </article>
         </div>
 
-        <article class="panel section-gap">
+        <article id="volumeRolloutPanel" class="panel section-gap">
           <div class="panel-head">
             <div>
               <p class="eyebrow">Comparison Rollout</p>
@@ -544,8 +545,11 @@
               <button id="volumeImageLightboxClose" class="chip" type="button" aria-label="Close reference image">Close</button>
             </div>
           </div>
-          <div id="volumeImageLightboxViewport" class="volume-image-lightbox__viewport">
-            <img id="volumeImageLightboxImage" alt="">
+          <div class="volume-image-lightbox__content">
+            <div id="volumeImageLightboxViewport" class="volume-image-lightbox__viewport">
+              <img id="volumeImageLightboxImage" alt="">
+            </div>
+            <aside id="volumeImageLightboxLegend" class="volume-image-lightbox__legend is-hidden"></aside>
           </div>
         </article>
       </div>
@@ -691,12 +695,12 @@
     {
       "id": "padstow-estuary",
       "name": "Padstow Estuary Monitoring System",
-      "description": "A consolidated FutureScaping workspace for repeated estuary surveys, combining project context, imagery outputs, section profiles, and operational notes in one reusable interface.",
+      "description": "A consolidated monitoring workspace for repeated Padstow estuary surveys, combining project context, imagery outputs, section profiles, and operational notes in one live reporting interface.",
       "site": {
         "name": "Padstow Harbour / Camel Estuary",
         "county": "Cornwall",
         "country": "England",
-        "context": "The original workflow proved the value of the survey outputs, but the apps are currently duplicated and Padstow-specific. This version starts turning that into one reusable monitoring system."
+        "context": "The original workflow proved the value of the survey outputs. This version brings the Padstow Harbour and Camel Estuary monitoring outputs into one reporting system."
       },
       "programme": {
         "cadence": "Repeat survey programme",
@@ -850,7 +854,7 @@
               "tags": [
                 "Day 1 April repeat",
                 "Near low tide",
-                "Area 4 pilot",
+                "Area 4 low-tide focus",
                 "Flight logs grouped"
               ],
               "cardNote": "Best Day 1 low-tide repeat window",
@@ -1021,7 +1025,7 @@
             "area3": {
               "method": "Later survey ground surface compared with the earlier survey inside the fixed Area 3 change footprint",
               "cellSize": "Survey grid size 0.10 m with a reporting threshold of +/-0.05 m",
-              "notes": "Area 3 is the current pilot for the refocused change page. This trial combines the hosted 3D viewer, downloaded classification imagery, and one plain-English measured summary before the wider rollout.",
+              "notes": "Area 3 combines the hosted 3D viewer, downloaded classification imagery, and a plain-English measured summary for the live change-analysis page.",
               "previewMode": "pair",
               "previewBaselineImage": "area3_height_change_analysis.jpg",
               "previewCurrentImage": "area3_gain_loss_classification.jpg",
@@ -1031,7 +1035,7 @@
               "previewCurrentCaption": "Simplified gain-and-loss classification for the same Area 3 comparison, useful as a quick client-facing reference image.",
               "viewerEmbedUrl": "https://hostedsite.vercel.app/?embed=1",
               "viewerTitle": "Area 3 3D Change Viewer",
-              "viewerSummary": "Interactive terrain preview for the Area 3 pilot comparison between 22-23 March 2026 and 18-19 April 2026. Use it with the measured totals and reference maps to inspect where sediment appears to have built up or lowered.",
+              "viewerSummary": "Interactive terrain preview for Area 3 between 22-23 March 2026 and 18-19 April 2026. Use it with the measured totals and reference maps to inspect where sediment appears to have built up or lowered.",
               "viewerStats": {
                 "analysedArea": "164,653 m2",
                 "gainArea": "79,834 m2",
@@ -1042,13 +1046,13 @@
               },
               "polygons": [
                 {
-                  "label": "Area 3 trial zone",
+                  "label": "Area 3 change footprint",
                   "gainM3": 13001.71,
                   "lossM3": 7430.795,
                   "netM3": 5570.915,
-                  "confidence": "Pilot trial",
+                  "confidence": "Measured review",
                   "summary": "Net accretion across the current Area 3 test footprint, with meaningful local loss still visible in parts of the compared surface.",
-                  "notes": "Aggregate Area 3 pilot summary for the first iframe-led change page."
+                  "notes": "Aggregate Area 3 summary for the first hosted change-analysis page."
                 }
               ]
             }
@@ -1062,7 +1066,7 @@
             "area3": {
               "method": "Later survey ground surface compared with the earlier survey inside the fixed Area 3 change footprint",
               "cellSize": "Survey grid size 0.10 m with a reporting threshold of +/-0.05 m",
-              "notes": "Area 3 is the current pilot for the refocused change page. This live view now frames the story from the first March survey through to the latest June survey, with the intermediate April round feeding the wider three-round analysis underneath.",
+              "notes": "Area 3 now frames the story from the first March survey through to the latest June survey, with the intermediate April round feeding the wider three-round analysis underneath.",
               "previewMode": "pair",
               "previewBaselineImage": "area3_s2_vs_s3_height_change_analysis.png",
               "previewCurrentImage": "area3_s2_vs_s3_gain_loss_classification.png",
@@ -1072,7 +1076,7 @@
               "previewCurrentCaption": "Simplified gain-and-loss classification for the same Area 3 review, useful as a quick client-facing reference image inside the wider March-to-June story.",
               "viewerEmbedUrl": "https://hostedsite.vercel.app/?embed=1",
               "viewerTitle": "Area 3 3D Change Viewer",
-              "viewerSummary": "Interactive terrain preview for the Area 3 pilot story between 22-23 March 2026 and 16-17 June 2026. Use it with the measured totals and reference maps to inspect where sediment appears to have built up or lowered across the wider monitoring window.",
+              "viewerSummary": "Interactive terrain preview for Area 3 between 22-23 March 2026 and 16-17 June 2026. Use it with the measured totals and reference maps to inspect where sediment appears to have built up or lowered across the wider monitoring window.",
               "viewerStats": {
                 "analysedArea": "164,653 m2",
                 "gainArea": "79,834 m2",
@@ -1083,13 +1087,13 @@
               },
               "polygons": [
                 {
-                  "label": "Area 3 trial zone",
+                  "label": "Area 3 change footprint",
                   "gainM3": 510,
                   "lossM3": 8333,
                   "netM3": -3224,
-                  "confidence": "Pilot trial",
+                  "confidence": "Measured review",
                   "summary": "Net lowering across the current Area 3 test footprint between April and June, with the later survey ending up lower overall.",
-                  "notes": "Aggregate Area 3 pilot summary for the April-to-June iframe-led change page."
+                  "notes": "Aggregate Area 3 summary for the April-to-June change-analysis page."
                 }
               ]
             }
@@ -1128,7 +1132,7 @@
         document.body.innerHTML = `
           <main style="min-height:100vh;display:grid;place-items:center;padding:32px;background:radial-gradient(circle at top, #203a63 0%, #0b172b 55%, #08111f 100%);color:#f3f7ff;font-family:Montserrat,Arial,sans-serif;">
             <section style="width:min(720px,100%);padding:32px;border-radius:28px;border:1px solid rgba(126,192,255,0.22);background:rgba(13,24,42,0.92);box-shadow:0 24px 60px rgba(0,0,0,0.35);">
-              <p style="margin:0 0 12px;font-size:0.82rem;letter-spacing:0.22em;text-transform:uppercase;color:#7ec0ff;">FutureScaping Monitoring System</p>
+              <p style="margin:0 0 12px;font-size:0.82rem;letter-spacing:0.22em;text-transform:uppercase;color:#7ec0ff;">Padstow Estuary Monitoring System</p>
               <h1 style="margin:0 0 16px;font-size:clamp(2rem,5vw,3.5rem);line-height:0.95;">Open the hosted project, not the raw file copy</h1>
               <p style="margin:0 0 14px;color:rgba(232,239,255,0.82);line-height:1.65;">This screen appeared because the project was opened from a local <code style="color:#9fd2ff;">file:///</code> path. The full monitoring system uses ES modules and needs either the hosted site or a local web server.</p>
               <p style="margin:0 0 22px;color:rgba(232,239,255,0.82);line-height:1.65;">Use <strong>Open Live Project</strong> to view the working public version, or run <code style="color:#9fd2ff;">run-local.cmd</code> if you want to test it locally.</p>

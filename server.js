@@ -21,6 +21,17 @@ const LOGIN_PAGE_PATH = path.join(__dirname, "login.html");
 const SESSION_COOKIE_NAME = "fsm_session";
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 12;
 const sessions = new Map();
+const LOCAL_AUTH_BYPASS = process.env.LOCAL_AUTH_BYPASS === "1";
+const LOCAL_BYPASS_SESSION = {
+  id: "local-bypass-session",
+  userId: "local-bypass-user",
+  username: "local",
+  label: "Local testing access",
+  expiresAt: Number.MAX_SAFE_INTEGER,
+  accessExpiresAt: null,
+  isMaster: true,
+  isAdmin: true
+};
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -446,6 +457,14 @@ async function handleAdminAuthRequest(request, response, session) {
       sendJson(response, 401, { error: "Sign-in required." });
       return;
     }
+    if (LOCAL_AUTH_BYPASS) {
+      session.isAdmin = true;
+      sendJson(response, 200, {
+        ok: true,
+        users: sanitiseAccessUsers(loadAccessUsers())
+      });
+      return;
+    }
     if (!ADMIN_PASSWORD) {
       sendJson(response, 500, { error: "Server configuration error: ADMIN_PASSWORD is not set." });
       return;
@@ -474,6 +493,17 @@ async function handleAdminAuthRequest(request, response, session) {
 }
 
 async function handleSiteAuthLoginRequest(request, response) {
+  if (LOCAL_AUTH_BYPASS) {
+    sendJson(response, 200, {
+      ok: true,
+      user: {
+        username: LOCAL_BYPASS_SESSION.username,
+        label: LOCAL_BYPASS_SESSION.label,
+        expiresAt: null
+      }
+    });
+    return;
+  }
   try {
     const body = await readJsonBody(request);
     const username = String(body.username || "").trim();
@@ -555,6 +585,10 @@ async function handleSiteAuthLoginRequest(request, response) {
 }
 
 async function handleSiteAuthLogoutRequest(request, response, session) {
+  if (LOCAL_AUTH_BYPASS) {
+    sendJson(response, 200, { ok: true });
+    return;
+  }
   if (session) {
     sessions.delete(session.id);
   }
@@ -772,6 +806,9 @@ function normaliseExpiry(value) {
 }
 
 function getSessionFromRequest(request) {
+  if (LOCAL_AUTH_BYPASS) {
+    return { ...LOCAL_BYPASS_SESSION };
+  }
   cleanupExpiredSessions();
   const cookies = parseCookies(request.headers.cookie || "");
   const sessionId = cookies[SESSION_COOKIE_NAME];

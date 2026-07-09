@@ -3,12 +3,12 @@
     {
       "id": "padstow-estuary",
       "name": "Padstow Estuary Monitoring System",
-      "description": "A consolidated FutureScaping workspace for repeated estuary surveys, combining project context, imagery outputs, section profiles, and operational notes in one reusable interface.",
+      "description": "A consolidated monitoring workspace for repeated Padstow estuary surveys, combining project context, imagery outputs, section profiles, and operational notes in one live reporting interface.",
       "site": {
         "name": "Padstow Harbour / Camel Estuary",
         "county": "Cornwall",
         "country": "England",
-        "context": "The original workflow proved the value of the survey outputs, but the apps are currently duplicated and Padstow-specific. This version starts turning that into one reusable monitoring system."
+        "context": "The original workflow proved the value of the survey outputs. This version brings the Padstow Harbour and Camel Estuary monitoring outputs into one reporting system."
       },
       "programme": {
         "cadence": "Repeat survey programme",
@@ -175,7 +175,7 @@
               "tags": [
                 "Day 1 April repeat",
                 "Near low tide",
-                "Area 4 pilot",
+                "Area 4 low-tide focus",
                 "Flight logs grouped"
               ],
               "cardNote": "Best Day 1 low-tide repeat window",
@@ -468,8 +468,19 @@
               "previewMode": "pair",
               "previewBaselineImage": "area4_volume_change_march_context.png",
               "previewCurrentImage": "area4_volume_change_april_context.png",
+              "previewBaselineLabel": "Height change analysis",
+              "previewCurrentLabel": "Gain and loss classification",
               "previewLabel": "Sandbar Volume Change Preview",
               "previewCaption": "These first preview maps place the measured change overlay on both survey contexts so people can see where the monitored sandbar appears to be building up or wearing away inside the measured zone.",
+              "viewerEmbedUrl": "https://area4-nine.vercel.app/?embed=1",
+              "viewerTitle": "Area 4 Change Analysis",
+              "viewerSummary": "Interactive change-analysis view for Area 4 alongside the wider three-round trend package. Use it with the trend panel and flat reference maps to see where the harbour-side area lowered first and then built back up by June.",
+              "viewerStats": {
+                "analysedArea": "683,066 m2",
+                "matchingCells": "36.9%",
+                "gridSize": "0.10 m",
+                "threshold": "+/-0.05 m"
+              },
               "polygons": [
                 {
                   "label": "Harbour Sandbar",
@@ -486,7 +497,7 @@
             "area3": {
               "method": "Later survey ground surface compared with the earlier survey inside the fixed Area 3 change footprint",
               "cellSize": "Survey grid size 0.10 m with a reporting threshold of +/-0.05 m",
-              "notes": "Area 3 is the current pilot for the refocused change page. This trial combines the hosted 3D viewer, downloaded classification imagery, and one plain-English measured summary before the wider rollout.",
+              "notes": "Area 3 combines the hosted 3D viewer, downloaded classification imagery, and a plain-English measured summary for the live change-analysis page.",
               "previewMode": "pair",
               "previewBaselineImage": "area3_height_change_analysis.jpg",
               "previewCurrentImage": "area3_gain_loss_classification.jpg",
@@ -496,7 +507,7 @@
               "previewCurrentCaption": "Simplified gain-and-loss classification for the same Area 3 comparison, useful as a quick client-facing reference image.",
               "viewerEmbedUrl": "https://hostedsite.vercel.app/?embed=1",
               "viewerTitle": "Area 3 3D Change Viewer",
-              "viewerSummary": "Interactive terrain preview for the Area 3 pilot comparison between 22-23 March 2026 and 18-19 April 2026. Use it with the measured totals and reference maps to inspect where sediment appears to have built up or lowered.",
+              "viewerSummary": "Interactive terrain preview for Area 3 between 22-23 March 2026 and 18-19 April 2026. Use it with the measured totals and reference maps to inspect where sediment appears to have built up or lowered.",
               "viewerStats": {
                 "analysedArea": "164,653 m2",
                 "gainArea": "79,834 m2",
@@ -507,13 +518,13 @@
               },
               "polygons": [
                 {
-                  "label": "Area 3 trial zone",
+                  "label": "Area 3 change footprint",
                   "gainM3": 13001.71,
                   "lossM3": 7430.795,
                   "netM3": 5570.915,
-                  "confidence": "Pilot trial",
+                  "confidence": "Measured review",
                   "summary": "Net accretion across the current Area 3 test footprint, with meaningful local loss still visible in parts of the compared surface.",
-                  "notes": "Aggregate Area 3 pilot summary for the first iframe-led change page."
+                  "notes": "Aggregate Area 3 summary for the first hosted change-analysis page."
                 }
               ]
             }
@@ -524,10 +535,31 @@
           "method": "Later survey ground surface compared with the earlier survey inside the fixed Area 3 change footprint",
           "cellSize": "Survey grid size 0.10 m with a reporting threshold of +/-0.05 m",
           "areas": {
+            "area4": {
+              "method": "Trend-based change review using the March, April, and June Area 4 exports across the full analysed footprint.",
+              "cellSize": "Survey grid size 0.10 m with a reporting threshold of +/-0.05 m",
+              "notes": "Area 4 now has a full three-round trend package, plus all three flat comparison sets across March-to-April, March-to-June, and April-to-June.",
+              "previewMode": "pair",
+              "previewBaselineImage": "area4_A_vs_C_height_change_analysis.png",
+              "previewCurrentImage": "area4_A_vs_C_gain_loss_classification.png",
+              "previewBaselineLabel": "Height change analysis",
+              "previewCurrentLabel": "Gain and loss classification",
+              "previewLabel": "Area 4 Trend Review",
+              "previewCaption": "This Area 4 setup uses the March-to-June change outputs as the top comparison view, then brings the wider trend-analysis package in underneath so people can see the longer three-round pattern.",
+              "viewerEmbedUrl": "https://area4-nine.vercel.app/?embed=1",
+              "viewerTitle": "Area 4 Change Analysis",
+              "viewerSummary": "Interactive change-analysis view for Area 4, framed from 22-23 March 2026 through to 16-17 June 2026. Use it with the trend panel and the exported flat maps to see where the area lowered first and then rebuilt by June.",
+              "viewerStats": {
+                "analysedArea": "683,066 m2",
+                "matchingCells": "37.0%",
+                "gridSize": "0.10 m",
+                "threshold": "+/-0.05 m"
+              }
+            },
             "area3": {
               "method": "Later survey ground surface compared with the earlier survey inside the fixed Area 3 change footprint",
               "cellSize": "Survey grid size 0.10 m with a reporting threshold of +/-0.05 m",
-              "notes": "Area 3 is the current pilot for the refocused change page. This live view now frames the story from the first March survey through to the latest June survey, with the intermediate April round feeding the wider three-round analysis underneath.",
+              "notes": "Area 3 now frames the story from the first March survey through to the latest June survey, with the intermediate April round feeding the wider three-round analysis underneath.",
               "previewMode": "pair",
               "previewBaselineImage": "area3_s2_vs_s3_height_change_analysis.png",
               "previewCurrentImage": "area3_s2_vs_s3_gain_loss_classification.png",
@@ -537,7 +569,7 @@
               "previewCurrentCaption": "Simplified gain-and-loss classification for the same Area 3 review, useful as a quick client-facing reference image inside the wider March-to-June story.",
               "viewerEmbedUrl": "https://hostedsite.vercel.app/?embed=1",
               "viewerTitle": "Area 3 3D Change Viewer",
-              "viewerSummary": "Interactive terrain preview for the Area 3 pilot story between 22-23 March 2026 and 16-17 June 2026. Use it with the measured totals and reference maps to inspect where sediment appears to have built up or lowered across the wider monitoring window.",
+              "viewerSummary": "Interactive terrain preview for Area 3 between 22-23 March 2026 and 16-17 June 2026. Use it with the measured totals and reference maps to inspect where sediment appears to have built up or lowered across the wider monitoring window.",
               "viewerStats": {
                 "analysedArea": "164,653 m2",
                 "gainArea": "79,834 m2",
@@ -548,13 +580,13 @@
               },
               "polygons": [
                 {
-                  "label": "Area 3 trial zone",
+                  "label": "Area 3 change footprint",
                   "gainM3": 510,
                   "lossM3": 8333,
                   "netM3": -3224,
-                  "confidence": "Pilot trial",
+                  "confidence": "Measured review",
                   "summary": "Net lowering across the current Area 3 test footprint between April and June, with the later survey ending up lower overall.",
-                  "notes": "Aggregate Area 3 pilot summary for the April-to-June iframe-led change page."
+                  "notes": "Aggregate Area 3 summary for the April-to-June change-analysis page."
                 }
               ]
             }

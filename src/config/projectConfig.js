@@ -1,5 +1,5 @@
 export const projectConfig = {
-  productName: "FutureScaping Monitoring System",
+  productName: "Padstow Estuary Monitoring System",
   branding: {
     overviewHeroImagePath: "./assets/overview-hero-estuary.png",
     overviewHeroImagePathBySurvey: {
