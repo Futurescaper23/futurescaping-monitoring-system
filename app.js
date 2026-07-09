@@ -85,6 +85,11 @@ const VALID_TABS = new Set(projectConfig.navigation.tabs);
 const AREA_ENABLED_TOOLBAR_TABS = new Set(["panorama", "volume", "layers", "sections"]);
 const SURVEY_MODEL_TABS = new Set(["areas", "panorama", "volume", "layers", "sections"]);
 const trendAreaPaths = {
+  area1: {
+    manifest: "./data/area1-trend-manifest.json",
+    stats: "./data/area1-trend-stats.json",
+    image: "./assets/area1-trend-classification-panel.png?v=20260709b"
+  },
   area3: {
     manifest: "./data/area3-trend-manifest.json",
     stats: "./data/area3-trend-stats.json",
@@ -3683,7 +3688,7 @@ async function renderVolume() {
           `).join("")}
         </div>
       </div>
-      <figure class="volume-trend-map">
+      <figure class="volume-trend-map" data-area-id="${escapeAttr(area.id)}">
         <button
           class="volume-trend-map__button"
           type="button"

@@ -3405,6 +3405,19 @@ textarea {
   object-fit: contain;
 }
 
+.volume-trend-map[data-area-id="area1"] .volume-trend-map__stage {
+  aspect-ratio: 2.5 / 1;
+}
+
+.volume-trend-map[data-area-id="area1"] .volume-trend-map__stage img {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  transform: none;
+  object-fit: contain;
+  object-position: center center;
+}
+
 .volume-trend-map figcaption {
   margin-top: 10px;
 }
