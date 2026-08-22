@@ -3082,6 +3082,12 @@ textarea {
   color: var(--text);
 }
 
+.volume-mini__subvalue {
+  display: block;
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
 .volume-mini--gain strong {
   color: #b7ffe1;
 }

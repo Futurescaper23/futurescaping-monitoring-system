@@ -3113,6 +3113,7 @@ async function renderVolumeLegacy() {
   const baselineLabel = volumeDataset?.baselineSurveyId
     ? (project.surveys.find((item) => item.id === volumeDataset.baselineSurveyId)?.label || baselineSurvey?.label || "baseline survey")
     : (baselineSurvey?.label || "baseline survey");
+  const comparisonDays = surveyGapDays(baselineSurvey, survey);
 
   els.volumeSummary.textContent = `${survey.label} is being compared against ${baselineLabel} for ${area.label}. This view translates elevation-surface change into plain-English cubic metre results for monitored sandbars.`;
   els.volumeImageSummary.textContent = "These aerial views give clients a quick visual before-and-after context for the same monitored area. The cubic metre figures underneath explain how much material was gained or lost.";
@@ -3138,8 +3139,8 @@ async function renderVolumeLegacy() {
     metric("Monitored sandbars", String(polygons.length), area.overviewCode),
     metric("Total gain", formatVolume(totals.gain), "Deposited sediment"),
     metric("Total loss", formatVolume(totals.loss), "Eroded sediment"),
-    metric("Total moved", formatVolume(totals.moved), "Sediment redistributed in either direction"),
-    metric("Net change", formatVolume(totals.net), totals.net >= 0 ? "Overall build-up" : "Overall erosion")
+    metric("Total moved", formatVolume(totals.moved), monthlyRateLabel(totals.moved, comparisonDays, "Equivalent monthly activity")),
+    metric("Net change", formatVolume(totals.net), monthlyRateLabel(totals.net, comparisonDays, "Equivalent monthly rate"))
   ].join("");
 
   els.volumeMethod.innerHTML = [
@@ -3184,10 +3185,12 @@ async function renderVolumeLegacy() {
           <div class="volume-mini">
             <span class="muted">Total moved</span>
             <strong>${escapeHtml(formatVolume(totalMovementVolume(item.gainM3, item.lossM3)))}</strong>
+            <span class="volume-mini__subvalue muted">${escapeHtml(monthlyRateLabel(totalMovementVolume(item.gainM3, item.lossM3), comparisonDays, "Equivalent monthly activity"))}</span>
           </div>
           <div class="volume-mini volume-mini--net">
             <span class="muted">Net</span>
             <strong>${escapeHtml(formatVolume(item.netM3))}</strong>
+            <span class="volume-mini__subvalue muted">${escapeHtml(monthlyRateLabel(item.netM3, comparisonDays, "Equivalent monthly rate"))}</span>
           </div>
         </div>
         <p>${escapeHtml(item.summary || "No plain-English summary added yet.")}</p>
@@ -3281,6 +3284,7 @@ async function renderVolumePrevious() {
   const baselineLabel = volumeDataset?.baselineSurveyId
     ? (project.surveys.find((item) => item.id === volumeDataset.baselineSurveyId)?.label || baselineSurvey?.label || "baseline survey")
     : (baselineSurvey?.label || "baseline survey");
+  const comparisonDays = surveyGapDays(baselineSurvey, survey);
 
   els.volumeSummary.textContent = `${survey.label} is being compared against ${baselineLabel} for ${area.label}. This view translates elevation-surface change into plain-English cubic metre results for monitored sandbars.`;
   els.volumeImageSummary.textContent = "These aerial views give clients a quick visual before-and-after context for the same monitored area. The cubic metre figures underneath explain how much material was gained or lost.";
@@ -3308,8 +3312,8 @@ async function renderVolumePrevious() {
       metric("Monitored sandbars", String(polygons.length), area.overviewCode),
       metric("Total gain", formatVolume(totals.gain), "Deposited sediment"),
       metric("Total loss", formatVolume(totals.loss), "Eroded sediment"),
-      metric("Total moved", formatVolume(totals.moved), "Sediment redistributed in either direction"),
-      metric("Net change", formatVolume(totals.net), totals.net >= 0 ? "Overall build-up" : "Overall erosion")
+      metric("Total moved", formatVolume(totals.moved), monthlyRateLabel(totals.moved, comparisonDays, "Equivalent monthly activity")),
+      metric("Net change", formatVolume(totals.net), monthlyRateLabel(totals.net, comparisonDays, "Equivalent monthly rate"))
     ].join("")
     : [
       metric("Monitored sandbars", String(polygons.length), area.overviewCode),
@@ -3364,10 +3368,12 @@ async function renderVolumePrevious() {
           <div class="volume-mini">
             <span class="muted">Total moved</span>
             <strong>${escapeHtml(formatVolume(totalMovementVolume(item.gainM3, item.lossM3)))}</strong>
+            <span class="volume-mini__subvalue muted">${escapeHtml(monthlyRateLabel(totalMovementVolume(item.gainM3, item.lossM3), comparisonDays, "Equivalent monthly activity"))}</span>
           </div>
           <div class="volume-mini volume-mini--net">
             <span class="muted">Net</span>
             <strong>${escapeHtml(formatVolume(item.netM3))}</strong>
+            <span class="volume-mini__subvalue muted">${escapeHtml(monthlyRateLabel(item.netM3, comparisonDays, "Equivalent monthly rate"))}</span>
           </div>
         </div>
         <p>${escapeHtml(item.summary || "No plain-English summary added yet.")}</p>
@@ -3443,6 +3449,7 @@ async function renderVolume() {
   const viewerGuideUse = areaDataset?.viewerGuideUse
     || "Start by turning the model around and zooming into the area you care about. If the view feels too busy, switch off Show base terrain to focus on the colour change only. If the model looks too thin or patchy, increase point size. If it looks too chunky, reduce point size for a cleaner look.";
   const trendData = await loadTrendData(area.id);
+  const comparisonDays = surveyGapDays(baselineSurvey, survey);
 
   setVolumeUnsupportedAreaLayout(!isLiveArea);
   renderVolumeQuickAreas(isLiveArea ? liveAreaIds : [], currentAreaSelection.id);
@@ -3694,10 +3701,12 @@ async function renderVolume() {
                 <div class="volume-mini">
                   <span class="muted">Total moved</span>
                   <strong>${escapeHtml(formatVolume(item.moved))}</strong>
+                  <span class="volume-mini__subvalue muted">${escapeHtml(monthlyRateLabel(item.moved, item.intervalDays, "Equivalent monthly activity"))}</span>
                 </div>
                 <div class="volume-mini volume-mini--net">
                   <span class="muted">Overall balance</span>
                   <strong>${escapeHtml(formatVolume(item.net))}</strong>
+                  <span class="volume-mini__subvalue muted">${escapeHtml(monthlyRateLabel(item.net, item.intervalDays, "Equivalent monthly rate"))}</span>
                 </div>
               </div>
               <p class="muted">${escapeHtml(item.supportingCopy)}</p>
@@ -3901,8 +3910,8 @@ async function renderVolume() {
       metric("Measured sandbar zones", String(polygons.length), area.overviewCode),
       metric("Material added", formatVolume(totals.gain), "More material appears in the later survey"),
       metric("Material removed", formatVolume(totals.loss), "Less material appears in the later survey"),
-      metric("Total moved", formatVolume(totals.moved), "Total sediment redistributed across the measured zones"),
-      metric("Overall balance", formatVolume(totals.net), totals.net >= 0 ? "More material overall in the later survey" : "Less material overall in the later survey")
+      metric("Total moved", formatVolume(totals.moved), monthlyRateLabel(totals.moved, comparisonDays, "Equivalent monthly activity")),
+      metric("Overall balance", formatVolume(totals.net), monthlyRateLabel(totals.net, comparisonDays, "Equivalent monthly rate"))
     ].join("")
     : [
       metric("Measured sandbar zones", String(polygons.length), area.overviewCode),
@@ -5426,10 +5435,47 @@ function totalMovementVolume(added, removed) {
   return Number(added || 0) + Math.abs(Number(removed || 0));
 }
 
+function surveyGapDays(fromSurvey, toSurvey) {
+  const start = String(fromSurvey?.dateFrom || fromSurvey?.dateTo || "").trim();
+  const end = String(toSurvey?.dateTo || toSurvey?.dateFrom || "").trim();
+  if (!start || !end) {
+    return null;
+  }
+  const startMs = new Date(`${start}T12:00:00`).getTime();
+  const endMs = new Date(`${end}T12:00:00`).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+    return null;
+  }
+  const days = Math.round((endMs - startMs) / 86400000);
+  return days > 0 ? days : null;
+}
+
+function monthlyEquivalentVolume(value, days) {
+  const number = Number(value || 0);
+  const gapDays = Number(days || 0);
+  if (!Number.isFinite(number) || !Number.isFinite(gapDays) || gapDays <= 0) {
+    return null;
+  }
+  return (number / gapDays) * 30.44;
+}
+
 function formatVolume(value) {
   const number = Number(value || 0);
   const rounded = Math.abs(number) >= 100 ? number.toFixed(0) : number.toFixed(1);
   return `${rounded} m3`;
+}
+
+function formatVolumeRate(value) {
+  if (!Number.isFinite(value)) {
+    return "";
+  }
+  const rounded = Math.abs(value) >= 100 ? value.toFixed(0) : value.toFixed(1);
+  return `${rounded} m3/month`;
+}
+
+function monthlyRateLabel(value, days, prefix) {
+  const rate = monthlyEquivalentVolume(value, days);
+  return rate === null ? prefix : `${prefix} ${formatVolumeRate(rate)}`;
 }
 
 function formatSquareMetres(value) {
