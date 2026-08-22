@@ -1,0 +1,32 @@
+{
+  "projectId": "padstow-estuary",
+  "surveyId": "2026-07-15",
+  "areaId": "area2",
+  "expectedFiles": [
+    "ortho.png",
+    "dsm.png",
+    "contours.png",
+    "section_profiles.csv"
+  ],
+  "presentFiles": [
+    "ortho.png",
+    "dsm.png",
+    "contours.png",
+    "section_profiles.csv"
+  ],
+  "missingFiles": [],
+  "sharedPresentFiles": [
+    "section_lines.png"
+  ],
+  "sharedMissingFiles": [],
+  "comparisonFiles": [
+    "area2_A_vs_C_gain_loss_classification.png",
+    "area2_A_vs_C_height_change_analysis.png",
+    "area2_A_vs_D_gain_loss_classification.png",
+    "area2_A_vs_D_height_change_analysis.png",
+    "area2_C_vs_D_gain_loss_classification.png",
+    "area2_C_vs_D_height_change_analysis.png"
+  ],
+  "status": "complete",
+  "lastUpdated": "2026-08-06T16:06:31.647Z"
+}

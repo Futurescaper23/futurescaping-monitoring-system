@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "area_id": "area2",
+  "area_label": "Area 2",
+  "generated_at": "2026-08-06T16:11:42",
+  "files": {
+    "classification_geotiff": "Area2_Trend_Classification.tif",
+    "classification_png": "Area2_Trend_Classification.png",
+    "stats_json": "Area2_Trend_Stats.json"
+  },
+  "summary": {
+    "top_trend_class": "Consistent erosion",
+    "classified_area_m2": 138375.05000000002,
+    "coverage_percent_of_boundary": 96.3867670263549
+  }
+}

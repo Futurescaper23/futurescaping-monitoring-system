@@ -1,8 +1,8 @@
-import { projectConfig } from "./src/config/projectConfig.js?v=20260529g";
-import { areaSettings, assetSettings, layerSettings } from "./src/data/areas.js?v=20260529g";
-import { environmentalContext } from "./src/data/environmentalContext.js?v=20260529g";
-import { sectionSettings } from "./src/data/sections.js?v=20260529g";
-import { volumeChangeSettings } from "./src/data/volumeChange.js?v=20260529g";
+import { projectConfig } from "./src/config/projectConfig.js?v=20260803a";
+import { areaSettings, assetSettings, layerSettings } from "./src/data/areas.js?v=20260722a";
+import { environmentalContext } from "./src/data/environmentalContext.js?v=20260722a";
+import { sectionSettings } from "./src/data/sections.js?v=20260722a";
+import { volumeChangeSettings } from "./src/data/volumeChange.js?v=20260722a";
 
   const state = {
   dataset: null,
@@ -78,30 +78,24 @@ import { volumeChangeSettings } from "./src/data/volumeChange.js?v=20260529g";
   volumeLightboxStartY: 0,
   volumeLightboxStartPanX: 0,
   volumeLightboxStartPanY: 0,
-  accessUsers: []
+  accessUsers: [],
+  projectCatalog: null
     };
 
-const VALID_TABS = new Set(projectConfig.navigation.tabs);
+const DEFAULT_TABS = Array.isArray(projectConfig.navigation.tabs) ? projectConfig.navigation.tabs : ["overview"];
+const VALID_TABS = new Set(DEFAULT_TABS);
 const AREA_ENABLED_TOOLBAR_TABS = new Set(["panorama", "volume", "layers", "sections"]);
 const SURVEY_MODEL_TABS = new Set(["areas", "panorama", "volume", "layers", "sections"]);
-const trendAreaPaths = {
-  area1: {
-    manifest: "./data/area1-trend-manifest.json",
-    stats: "./data/area1-trend-stats.json",
-    image: "./assets/area1-trend-classification-panel.png?v=20260709b"
-  },
-  area3: {
-    manifest: "./data/area3-trend-manifest.json",
-    stats: "./data/area3-trend-stats.json",
-    image: "./assets/area3-trend-classification-panel.png"
-  },
-  area4: {
-    manifest: "./data/area4-trend-manifest.json",
-    stats: "./data/area4-trend-stats.json",
-    image: "./assets/area4-trend-classification-panel.png"
-  }
-};
 const trendAreaCachePromises = new Map();
+const TREND_MIN_COVERAGE_PERCENT = 5;
+const COMPARISON_PAIR_DEFS = [
+  { key: "ab", fromRoundId: "A", toRoundId: "B", surveyId: "2026-04-18" },
+  { key: "ac", fromRoundId: "A", toRoundId: "C", surveyId: "2026-06-16" },
+  { key: "bc", fromRoundId: "B", toRoundId: "C", surveyId: "2026-06-16" },
+  { key: "ad", fromRoundId: "A", toRoundId: "D", surveyId: "2026-07-15" },
+  { key: "bd", fromRoundId: "B", toRoundId: "D", surveyId: "2026-07-15" },
+  { key: "cd", fromRoundId: "C", toRoundId: "D", surveyId: "2026-07-15" }
+];
 
   const EXPLICIT_SECTION_IMAGE_TRACKS = {
     area1: [
@@ -164,6 +158,40 @@ const SECTION_PROFILE_COLORS = [
   "#c7a2ff",
   "#ff9ad5"
 ];
+
+const DEFAULT_SECTION_CHART_DISPLAY_BY_PROJECT = {
+  "padstow-estuary": {
+    maxDisplayHeight: 3,
+    showClippedOverlay: true
+  }
+};
+
+const SECTION_CHART_DISPLAY_OVERRIDES = {
+  "padstow-estuary:area3:A3-01": {
+    maxDisplayHeight: 4,
+    showClippedOverlay: true
+  },
+  "padstow-estuary:area3:A3-02": {
+    maxDisplayHeight: 4,
+    showClippedOverlay: true
+  },
+  "padstow-estuary:area3:A3-03": {
+    maxDisplayHeight: 4,
+    showClippedOverlay: true
+  },
+  "padstow-estuary:area8:A8-01": {
+    maxDisplayHeight: 4,
+    showClippedOverlay: true
+  },
+  "padstow-estuary:area8:A8-02": {
+    maxDisplayHeight: 4,
+    showClippedOverlay: true
+  },
+  "padstow-estuary:area8:A8-03": {
+    maxDisplayHeight: 4,
+    showClippedOverlay: true
+  }
+};
 
 const BASELINE_AREA_OVERVIEW = {
   area1: {
@@ -566,6 +594,8 @@ const els = {
   sectionInsightOverlayTitle: byId("sectionInsightOverlayTitle"),
   sectionInsightOverlaySummary: byId("sectionInsightOverlaySummary"),
   sectionInsightOverlayBody: byId("sectionInsightOverlayBody"),
+  overviewOnboardingSummary: byId("overviewOnboardingSummary"),
+  overviewOnboardingDetails: byId("overviewOnboardingDetails"),
   adminTargetSummary: byId("adminTargetSummary"),
   adminExpectedFiles: byId("adminExpectedFiles"),
   uploadOrtho: byId("uploadOrtho"),
@@ -610,6 +640,8 @@ const els = {
   saveVolumeBtn: byId("saveVolumeBtn"),
   volumeAdminStatus: byId("volumeAdminStatus"),
   adminUploadStatus: byId("adminUploadStatus"),
+  adminOnboardingSummary: byId("adminOnboardingSummary"),
+  adminOnboardingDetails: byId("adminOnboardingDetails"),
   adminBoardSummary: byId("adminBoardSummary"),
   adminBoardGrid: byId("adminBoardGrid"),
   accessLabelInput: byId("accessLabelInput"),
@@ -634,14 +666,16 @@ bootstrap().catch((error) => {
 });
 
 async function bootstrap() {
-  state.dataset = await loadProjectDataset();
+  const { dataset, projectCatalog, requestedProjectId } = await loadProjectDataset();
+  state.dataset = dataset;
+  state.projectCatalog = projectCatalog;
   const requestedAdminMode = new URLSearchParams(window.location.search).get("admin") === "1" || window.localStorage.getItem("fsm-admin-mode") === "1";
   const siteSession = await loadSiteSession();
   state.adminMode = adminToolsEnabled() && requestedAdminMode && Boolean(siteSession?.user?.isAdmin);
   if (!adminToolsEnabled() || !siteSession?.user?.isAdmin) {
     window.localStorage.removeItem("fsm-admin-mode");
   }
-  state.projectId = state.dataset.projects[0].id;
+  state.projectId = requestedProjectId || state.dataset.projects[0].id;
   const defaultSurvey = currentProject().surveys[currentProject().surveys.length - 1];
   state.surveyId = defaultSurvey.id;
   state.primarySurveyId = state.surveyId;
@@ -666,27 +700,131 @@ async function loadProjectDataset() {
   if (window.location.protocol === "file:") {
     const inlineData = window.__FSM_PROJECTS__;
     if (inlineData?.projects?.length) {
-      return inlineData;
-    }
-    const embeddedJson = document.getElementById("fsmProjectDataset")?.textContent?.trim();
-    if (embeddedJson) {
-      try {
-        const parsed = JSON.parse(embeddedJson);
-        if (parsed?.projects?.length) {
-          return parsed;
-        }
-      } catch (error) {
-        throw new Error("The embedded local dataset could not be parsed.");
-      }
+      return {
+        dataset: inlineData,
+        projectCatalog: null,
+        requestedProjectId: inlineData.projects[0]?.id || null
+      };
     }
     throw new Error("This local preview needs the bundled data script. Keep `data/projects.inline.js` beside the app when opening `index.html` directly.");
   }
 
-  const response = await fetch(projectConfig.data.projectsPath);
+  const projectCatalog = await fetchJson("/public/projects/index.json", "Project catalog could not be loaded.");
+  const availableProjects = Array.isArray(projectCatalog?.projects) ? projectCatalog.projects : [];
+  const requestedProjectId = requestedProjectSlug()
+    || new URLSearchParams(window.location.search).get("project")
+    || projectCatalog?.defaultProjectId
+    || availableProjects[0]?.id
+    || null;
+
+  if (!requestedProjectId) {
+    throw new Error("No project is configured for this monitoring platform.");
+  }
+
+  const catalogEntry = availableProjects.find((item) => item.id === requestedProjectId) || null;
+  if (!catalogEntry) {
+    throw new Error(`Project not found: ${requestedProjectId}`);
+  }
+
+  const projectMeta = await fetchJson(catalogEntry.projectPath || projectDataPath(requestedProjectId, "project.json"), "Project metadata could not be loaded.");
+  const areasPayload = await fetchJson(catalogEntry.areasPath || projectDataPath(requestedProjectId, "areas.json"), "Project areas could not be loaded.");
+  const scansPayload = await fetchJson(catalogEntry.scansPath || projectDataPath(requestedProjectId, "scans.json"), "Project scans could not be loaded.");
+  const contentPayload = await fetchOptionalJson(catalogEntry.contentPath || projectDataPath(requestedProjectId, "content.json"));
+  const dataset = await buildDatasetForProject(requestedProjectId, projectMeta, areasPayload, scansPayload, contentPayload);
+
+  return {
+    dataset,
+    projectCatalog,
+    requestedProjectId
+  };
+}
+
+async function fetchJson(path, fallbackMessage) {
+  const response = await fetch(path);
   if (!response.ok) {
-    throw new Error("Project data could not be loaded.");
+    throw new Error(fallbackMessage);
   }
   return response.json();
+}
+
+async function fetchOptionalJson(path) {
+  const response = await fetch(path);
+  if (!response.ok) {
+    return null;
+  }
+  return response.json().catch(() => null);
+}
+
+function requestedProjectSlug() {
+  const match = window.location.pathname.match(/^\/project\/([^/]+)\/?$/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function projectDataPath(projectId, fileName) {
+  return `/public/projects/${encodeURIComponent(projectId)}/${fileName}`;
+}
+
+async function buildDatasetForProject(projectId, projectMeta, areasPayload, scansPayload, contentPayload = null) {
+  const dataSource = projectMeta?.dataSource || {};
+  let baseProject = null;
+
+  if (dataSource.datasetPath) {
+    const legacyDataset = await fetchJson(dataSource.datasetPath, "Project data could not be loaded.");
+    const legacyProjectId = dataSource.projectId || projectId;
+    baseProject = legacyDataset?.projects?.find((item) => item.id === legacyProjectId) || null;
+    if (!baseProject) {
+      throw new Error(`Project data is missing for ${legacyProjectId}.`);
+    }
+  }
+
+  const projectAreaList = normaliseProjectAreaList(areasPayload?.areas || []);
+  const projectAreaBaselines = Object.fromEntries(projectAreaList.map((area) => [area.id, area]));
+  const projectSurveys = Array.isArray(scansPayload?.surveys) && scansPayload.surveys.length
+    ? scansPayload.surveys
+    : (baseProject?.surveys || []);
+  const overridesPayload = await fetchOptionalJson(projectDataPath(projectId, "survey-area-overrides.json"));
+  const volumeChangePayload = await fetchOptionalJson(projectDataPath(projectId, "volume-change.json"));
+
+  const mergedProject = {
+    ...(baseProject || {}),
+    ...projectMeta,
+    id: projectMeta?.id || baseProject?.id || projectId,
+    site: {
+      ...(baseProject?.site || {}),
+      ...(projectMeta?.site || {})
+    },
+    programme: {
+      ...(baseProject?.programme || {}),
+      ...(projectMeta?.programme || {})
+    },
+    surveys: projectSurveys,
+    workflow: Array.isArray(projectMeta?.workflow) && projectMeta.workflow.length
+      ? projectMeta.workflow
+      : (baseProject?.workflow || []),
+    branding: {
+      ...(projectMeta?.branding || {})
+    },
+    content: contentPayload || projectMeta?.content || {},
+    surveyAreaOverrides: overridesPayload?.surveyAreaOverrides || baseProject?.surveyAreaOverrides || {},
+    volumeChangeComparisons: volumeChangePayload?.volumeChangeComparisons || baseProject?.volumeChangeComparisons || {},
+    projectAreaList,
+    projectAreaBaselines,
+    singleScanMessage: projectMeta?.singleScanMessage || "Change monitoring will become available after the second comparable survey."
+  };
+
+  return { projects: [mergedProject] };
+}
+
+function normaliseProjectAreaList(areasList) {
+  return areasList.map((area, index) => {
+    const inferredNumber = Number(area.number || String(area.id || "").replace(/\D+/g, "")) || (index + 1);
+    return {
+      ...area,
+      id: area.id || `${areaSettings.idPrefix}${inferredNumber}`,
+      number: inferredNumber,
+      overviewCode: area.overviewCode || `${areaSettings.codePrefix}${inferredNumber}`
+    };
+  });
 }
 
 function applyUrlState() {
@@ -709,7 +847,8 @@ function applyUrlState() {
 
   const requestedTab = params.get("tab") || params.get("view");
   const inferredTab = sectionId ? "sections" : areaId ? "areas" : state.activeTab;
-  const tab = VALID_TABS.has(requestedTab) ? requestedTab : inferredTab;
+  const allowedTabs = new Set(projectNavigationTabs(project));
+  const tab = allowedTabs.has(requestedTab) ? requestedTab : inferredTab;
   state.activeTab = (!adminToolsEnabled() || !state.adminMode) && tab === "admin" ? "overview" : tab;
   const overviewMode = params.get("mode");
   if (["information", "survey", "help"].includes(overviewMode)) {
@@ -1219,6 +1358,7 @@ function bindEvents() {
 }
 
 function renderAll() {
+  syncProjectTabAvailability();
   renderShellToolbar();
   fillSelect(els.surveySelect, currentProject().surveys.map((survey) => [survey.id, survey.label]), state.surveyId);
   fillSelect(els.areaSelect, areaSelectOptions(), state.areaId);
@@ -1247,6 +1387,32 @@ function renderShellToolbar() {
 
   document.querySelector(".shell-toolbar")?.classList.toggle("shell-toolbar--inactive", !areaSelectEnabled);
   areaField?.classList.toggle("hidden", !areaSelectEnabled);
+}
+
+function projectNavigationTabs(project = currentProject()) {
+  const configuredTabs = Array.isArray(project?.navigation?.tabs) ? project.navigation.tabs : DEFAULT_TABS;
+  const allowedTabs = configuredTabs.filter((tab) => VALID_TABS.has(tab));
+  return allowedTabs.length ? allowedTabs : DEFAULT_TABS;
+}
+
+function firstAvailableProjectTab() {
+  return projectNavigationTabs()[0] || "overview";
+}
+
+function syncProjectTabAvailability() {
+  const allowedTabs = new Set(projectNavigationTabs());
+
+  document.querySelectorAll(".tab").forEach((item) => {
+    item.classList.toggle("hidden", !allowedTabs.has(item.dataset.tab));
+  });
+
+  document.querySelectorAll(".tab-panel").forEach((panel) => {
+    panel.classList.toggle("hidden", !allowedTabs.has(panel.dataset.panel));
+  });
+
+  if (!allowedTabs.has(state.activeTab)) {
+    state.activeTab = allowedTabs.has("overview") ? "overview" : firstAvailableProjectTab();
+  }
 }
 
 async function renderShellStage() {
@@ -1347,21 +1513,33 @@ async function renderShellStage() {
 }
 
 function configuredAreaHeroImage(surveyId, areaId) {
-  return projectConfig.branding?.areaHeroImagesBySurvey?.[surveyId]?.[areaId] || "";
+  return currentProjectBranding()?.areaHeroImagesBySurvey?.[surveyId]?.[areaId] || "";
 }
 
 function configuredAreaHeroArtDirection(surveyId, areaId) {
-  return projectConfig.branding?.areaHeroArtDirectionBySurvey?.[surveyId]?.[areaId] || null;
+  return currentProjectBranding()?.areaHeroArtDirectionBySurvey?.[surveyId]?.[areaId] || null;
 }
 
 function configuredOverviewHeroImage(surveyId) {
-  return projectConfig.branding?.overviewHeroImagePathBySurvey?.[surveyId]
-    || projectConfig.branding?.overviewHeroImagePath
+  return currentProjectBranding()?.overviewHeroImagePathBySurvey?.[surveyId]
+    || currentProjectBranding()?.overviewHeroImagePath
     || "";
 }
 
 function configuredSurveyModelUrl(surveyId) {
-  return String(projectConfig.branding?.niraModelsBySurvey?.[surveyId] || "").trim();
+  return String(currentProjectBranding()?.niraModelsBySurvey?.[surveyId] || "").trim();
+}
+
+function currentProjectBranding() {
+  return currentProject()?.branding || {};
+}
+
+function currentProjectContent() {
+  return currentProject()?.content || {};
+}
+
+function currentProjectEnvironment() {
+  return currentProject()?.environment || {};
 }
 
 function renderShellStageAction(survey) {
@@ -1392,7 +1570,7 @@ function renderShellStageAction(survey) {
     els.shellStageAction.innerHTML = `
       <div class="shell-stage-action-link shell-stage-action-link--disabled" aria-disabled="true">
         <span class="shell-stage-action-link__label">3D Model Coming Soon</span>
-        <span class="shell-stage-action-link__sub">${escapeHtml(`Add the Nira link for ${survey.shortDate || survey.label} in project config to enable this button.`)}</span>
+        <span class="shell-stage-action-link__sub">${escapeHtml(`The 3D model for ${survey.shortDate || survey.label} is not available here yet.`)}</span>
       </div>
     `;
   }
@@ -1405,12 +1583,14 @@ function activeTabShellMeta() {
   const survey = currentSurvey();
   const area = currentArea();
   const section = currentArea().sections.find((item) => item.id === state.sectionId) || currentArea().sections[0];
+  const projectSiteName = project.site?.name || currentProjectEnvironment().defaultLocationName || "the monitoring area";
+  const projectShortName = project.shortName || project.name || "Monitoring Project";
 
   const metaByTab = {
     overview: {
-      eyebrow: "Padstow Estuary Monitoring",
+      eyebrow: projectShortName,
       title: "Monitoring System",
-      summary: "Visual change monitoring for Padstow Harbour and the wider Camel Estuary."
+      summary: `Visual change monitoring for ${projectSiteName}.`
     },
     areas: {
       eyebrow: "Monitoring Areas",
@@ -1499,6 +1679,11 @@ async function renderOverview() {
   const overviewMode = getOverviewModePayload(project);
   els.projectTitle.textContent = project.name;
   els.projectSummary.textContent = project.description;
+  document.title = project.name || projectConfig.productName;
+  const stageBrand = byId("shellStageBrandName");
+  if (stageBrand) {
+    stageBrand.textContent = project.shortName || project.name || projectConfig.productName;
+  }
   els.overviewHeroTitle.textContent = overviewMode.heroTitle;
   els.overviewHeroText.textContent = overviewMode.heroText;
   els.overviewStoryTitle.textContent = overviewMode.storyTitle;
@@ -1611,14 +1796,20 @@ async function renderOverview() {
     });
   });
 
+  const singleScanOnly = (project.surveys || []).length < 2;
   els.surveyReadinessGrid.innerHTML = [
-    metric("Track movement", "See where bars and channels shift", "Look for visible movement between one survey and the next."),
+    metric(
+      singleScanOnly ? "Change monitoring" : "Track movement",
+      singleScanOnly ? "Awaiting a second comparable survey" : "See where bars and channels shift",
+      singleScanOnly ? project.singleScanMessage : "Look for visible movement between one survey and the next."
+    ),
     metric("Work by area", "Focus on one stretch of estuary at a time", "Each monitoring area can be explored on its own without losing the bigger picture."),
     metric("Use cross-sections", "Check where the ground rises and falls", "Cross-sections show the shape of the estuary along a fixed line."),
     metric("Use aerial views", "Inspect the estuary closely", "Zoom in on aerial imagery, elevation colour maps, and contour views.")
   ].join("");
 
   els.surveyReadinessDetails.innerHTML = [
+    ...(singleScanOnly ? [detail("Change monitoring status", project.singleScanMessage)] : []),
     detail("What to look for", "Focus on where sandbanks, channels, and exposed ground appear to shift between one survey and the next."),
     detail("Why low tide matters", "The surveys are most useful when more of the estuary bed is exposed, because that is where movement is easiest to see."),
     detail("How this helps", "This gives a clearer picture of what is changing, where access may be affected, and where further attention may be needed.")
@@ -1634,473 +1825,29 @@ async function renderOverview() {
   enhanceOverviewGlanceWithConfirmedTides(survey, overviewMode.glance, state.overviewMode);
 }
 
-const INFORMATION_STORY = [
-  {
-    id: "about",
-    title: "About the Project",
-    paragraphs: [
-      "The Padstow Estuary Monitoring Project is a structured drone survey programme commissioned by Padstow Harbour Commission and delivered by FutureScaping.",
-      "Its purpose is to monitor how the estuary changes over time, with particular focus on the movement of sandbanks, sandbars, and exposed intertidal sediment. By repeating surveys across the year, the project builds a clearer picture of where material is shifting, how quickly those changes are happening, and how the shape of the estuary is evolving.",
-      "This is not a one-off snapshot. It is designed as an ongoing monitoring programme, beginning with 14 surveys across a year, so that patterns can be tracked through time rather than guessed from isolated observations."
-    ]
-  },
-  {
-    id: "why",
-    title: "Why the Estuary is Being Monitored",
-    paragraphs: [
-      "Padstow's estuary is a dynamic environment. Channels shift, sandbanks move, and the navigable routes into the harbour can change over time.",
-      "One of the main practical drivers is navigation. The harbour needs to remain accessible for the fishing community, tourism, commercial activity, and general harbour use. Sediment movement affects where channels remain open and where dredging may be needed.",
-      "The project is intended to help Padstow Harbour Commission understand where sandbars and sandbanks are moving, how quickly those changes are taking place, which areas appear more stable, and where dredging effort may need to be focused.",
-      "There is also an environmental benefit to better monitoring. If dredging can be guided by clearer evidence, it may help reduce unnecessary work and minimise avoidable disturbance within the estuary."
-    ]
-  },
-  {
-    id: "process",
-    title: "How the Survey Process Works",
-    paragraphs: [
-      "The project uses drone photogrammetry to capture large numbers of overlapping aerial photographs across the estuary during low tide.",
-      "Those photographs are then processed to create outputs such as high-resolution aerial imagery, 3D surface models, elevation-based visualisations, and comparison material that can be reviewed over time.",
-      "By repeating this process on a regular basis, it becomes possible to compare one survey against another and identify areas of movement, stability, erosion, accretion, and change."
-    ]
-  },
-  {
-    id: "tide",
-    title: "Why Low Tide Matters",
-    paragraphs: [
-      "The project depends on surveying the estuary at low tide, because that is when the sandbanks, bars, and intertidal surfaces are most exposed.",
-      "At first, it seemed likely that the estuary could be covered within a single workable tide window. In reality, the first survey showed that the usable period is much tighter than it appears on paper once travel time, battery changes, launch positions, weather, and access are all factored in.",
-      "Although the project has generally worked around a period of roughly two to two and a half hours either side of low tide, the practical window for the best results can be much narrower depending on conditions and survey logistics."
-    ]
-  },
-  {
-    id: "planning",
-    title: "Planning the Survey Programme",
-    paragraphs: [
-      "A lot of work went into testing the survey method before the first full scan was carried out.",
-      "This included trialling different side overlap settings, different flight heights, different flight speeds, and different assumptions about how the estuary could be divided into workable survey areas.",
-      "One of the key balances was between capture quality and survey efficiency. Higher side overlap means more flight lines, more passes, more time in the air, and a longer overall survey.",
-      "The first practical testing phase was crucial because it showed that the technical method would work, but it also revealed that real-world logistics across the estuary would be a much bigger challenge than first expected."
-    ]
-  },
-  {
-    id: "evolved",
-    title: "How the Workflow Evolved",
-    paragraphs: [
-      "The original survey concept was simpler than the final version used on site.",
-      "At the start, the estuary had been divided into four larger areas. Once test flights and site experience were brought into the process, it became clear that this layout was not realistic.",
-      "The estuary is wide in places, and some areas cannot be surveyed properly from a single position while maintaining safe and compliant drone operations. This led to the survey structure being broken down into eight areas instead of four, particularly where wider sections needed to be split to preserve visual line of sight.",
-      "The project scope also extended further up the estuary, which added further operational complexity but gave a more complete picture of wider sediment movement."
-    ]
-  },
-  {
-    id: "challenges",
-    title: "Operational Challenges on Site",
-    paragraphs: [
-      "The first full survey showed very clearly that the estuary is much harder to cover in reality than it appears on a map.",
-      "One of the biggest operational challenges was simply moving between areas. Every relocation between launch points took longer than expected, whether by car, bike, or on foot. Battery changes, setup time, and access delays all added pressure.",
-      "The survey became a constant balance between catching the tide at the right stage, reaching the next launch point in time, maintaining safe operations, and trying to maximise useful flying time before conditions changed again.",
-      "The upper estuary also brought different access issues from the lower sections, and some routes that looked straightforward on a map proved awkward, soft, or time-consuming on the ground."
-    ]
-  },
-  {
-    id: "photogrammetry",
-    title: "How Photogrammetry Works",
-    paragraphs: [
-      "Photogrammetry is the process of building accurate mapped outputs from large numbers of overlapping photographs.",
-      "As the drone flies its survey pattern, it captures images with enough overlap for software to identify common visual points between them. Those shared points are then used to tie the imagery together into larger mapped surfaces and 3D reconstructions.",
-      "This works particularly well where the ground has visible texture, stable detail, and enough consistent surface information for the software to recognise."
-    ]
-  },
-  {
-    id: "water",
-    title: "Why Open Water Is Difficult",
-    paragraphs: [
-      "One of the most important practical lessons from the first survey was the difference between exposed land and open water.",
-      "Photogrammetry relies on matching stable visual features from one image to the next. Water does not behave like that. It is constantly moving, reflecting light differently, and often presenting very little fixed detail for software to recognise.",
-      "As a result, open water areas can produce unreliable reconstruction if treated the same way as land. That is a normal limitation of photogrammetry in environments that include moving water.",
-      "For this monitoring programme, that limitation is manageable because the most important outputs come from the exposed intertidal ground and sediment visible around low tide."
-    ]
-  },
-  {
-    id: "limits",
-    title: "Understanding the Limits of the Data",
-    paragraphs: [
-      "Like any monitoring method, drone photogrammetry has strengths and limitations.",
-      "The outputs are strongest where the survey surface is exposed, textured, stable, and clearly visible during low tide. The limitations become more obvious around moving water, water edges, reflective surfaces, and areas where the software cannot find stable visual reference points.",
-      "The project is not about claiming that every part of the estuary can be modelled equally well. It is about using the method intelligently to extract the most meaningful information from the areas where it is strongest."
-    ]
-  },
-  {
-    id: "contours",
-    title: "Why Some Contours and Elevation Outputs Are Filtered",
-    paragraphs: [
-      "Where moving water is included in the captured imagery, the resulting height calculations can become highly unstable.",
-      "This can lead to false spikes or false depressions in the data, sometimes producing clearly unrealistic values that do not represent the true surface of the estuary. Because of that, some contour and elevation outputs have been filtered or clipped so that misleading artefacts do not dominate the final maps.",
-      "This is not about hiding data. It is about presenting terrain information in a way that is useful and honest, rather than allowing false artefacts to overwhelm the outputs."
-    ]
-  },
-  {
-    id: "models",
-    title: "Why Some 3D Models Are Simplified",
-    paragraphs: [
-      "The original photogrammetry models are extremely large and detailed. While that is excellent for analysis, it is not always suitable for a smooth online viewing experience.",
-      "To make the project accessible through 3DVista, the models included within the tour have been reduced and simplified so that they load more reliably and perform better across devices.",
-      "This is a practical trade-off between detail and usability. The lighter models remain useful for interpretation and storytelling, while more detailed versions are available when closer inspection is needed."
-    ]
-  },
-  {
-    id: "nira",
-    title: "Why a High-Resolution Model Also Exists",
-    paragraphs: [
-      "Alongside the lighter 3DVista models, a separate high-resolution model is available through Nira.",
-      "This version preserves far more of the original detail and is better suited to close inspection, detailed viewing, and more intensive exploration.",
-      "In simple terms, 3DVista is used for accessible, smooth, client-friendly viewing, while Nira provides a higher-detail companion model for more in-depth inspection."
-    ]
+async function enhanceOverviewGlanceWithConfirmedTides(survey, glance = [], overviewMode = state.overviewMode) {
+  if (!survey || !Array.isArray(glance) || !glance.length) return;
+
+  const snapshotSurveyId = survey.id;
+  const snapshotMode = overviewMode;
+  const summary = await confirmedSurveyTideSummary(survey);
+  if (!summary) return;
+
+  if (state.surveyId !== snapshotSurveyId || state.overviewMode !== snapshotMode) {
+    return;
   }
-];
 
-const HELP_STORY = [
-  {
-    id: "quick-start",
-    title: "Quick Start",
-    paragraphs: [
-      "If this is your first time using the project, start with Overview so you can understand the survey round, the monitored areas, and the main purpose of the work.",
-      "Then use Survey Areas to move into one part of the estuary, Compare to inspect imagery and change, Sections to read fixed profile lines, and Volume Change when measured sandbar results are available.",
-      "Open Information for the stable project story, Survey Notes for round-specific lessons from the field, and Help whenever you need guidance."
-    ]
-  },
-  {
-    id: "main-menu",
-    title: "Main Menu Guide",
-    paragraphs: [
-      "Overview is the main starting point for the project. It gives you the broad survey picture, the current round, and the context for the monitoring work.",
-      "Survey Areas lets you move into one monitored location at a time. Weather shows tide and weather context for the selected survey round.",
-      "Compare, Sections, and Volume Change are the main interpretation tools. Information explains the wider project background, Survey Notes captures what was learned in each round, and Help explains how to use the system."
-    ]
-  },
-  {
-    id: "areas",
-    title: "Areas",
-    paragraphs: [
-      "The Areas menu lets you jump directly into a monitored part of the estuary.",
-      "Current areas include A1 Hawker's Cove, A2 Daymer Bay, A3 Rock Beach, A4 Padstow Harbour, A5 Porthilly Cove, A6 Old Town Cove, A7 Slate Quarry, and A8 Wadebridge.",
-      "Use Areas when you want to focus on one location and use the detailed area tools."
-    ]
-  },
-  {
-    id: "area-tools",
-    title: "Area Tools Guide",
-    paragraphs: [
-      "When you open an area, the main tools each answer a slightly different question.",
-      "Compare is best for visual before-and-after work using aerial imagery, colour elevation, contours, overlay, swipe, and highlight change. Sections is best for following one fixed line and seeing how ground height changes along it between survey rounds.",
-      "Volume Change is the place for measured sandbar gain and loss once those results have been prepared. It is normal to move between these tools when trying to understand one part of the estuary properly."
-    ]
-  },
-  {
-    id: "sections",
-    title: "How to Use Sections",
-    paragraphs: [
-      "Open the Sections tab inside an area to view fixed section lines and their profile graphs.",
-      "Choose Section 1, 2, or 3, view where that line runs across the map, and then move across the chart to follow the same point on the section line. You can also tick more than one survey profile to compare the same fixed line between rounds.",
-      "Use Sections when you want a measured cross-section through the estuary surface rather than a broad visual overview."
-    ]
-  },
-  {
-    id: "compare",
-    title: "How to Use Compare and Highlight Change",
-    paragraphs: [
-      "Use Compare when you want to place two survey rounds or two view types side by side in a single workspace.",
-      "Single View is the cleanest starting point. Overlay and Swipe are useful when you want to inspect one shoreline, sand edge, or channel boundary closely. Highlight Change is a guided view that helps draw attention to likely movement between the two rounds.",
-      "Use these tools when you want to focus on what has shifted or changed rather than just viewing one survey on its own."
-    ]
-  },
-  {
-    id: "volume-change",
-    title: "How to Use Volume Change",
-    paragraphs: [
-      "Volume Change is designed to explain how much sand or sediment appears to have been added, removed, or left in overall balance within a monitored sandbar area.",
-      "It is best treated as a measured reporting tool rather than a general browsing view. The preview maps show where the monitored zone sits, while the figures explain the amount of material change in plain-English terms.",
-      "As more areas are processed, this section will become the clearest place to understand sandbar build-up, loss, and longer-term movement between survey rounds."
-    ]
-  },
-  {
-    id: "mobile",
-    title: "How to Navigate on Phone",
-    paragraphs: [
-      "On mobile, use the menu button to open the main navigation.",
-      "Once inside an area, use the lower navigation bar to switch between the available tools such as Compare, Sections, and Volume Change.",
-      "If the screen feels crowded, close the main menu before exploring and focus on one tool at a time."
-    ]
-  },
-  {
-    id: "important-notes",
-    title: "Important Things to Understand",
-    paragraphs: [
-      "Open water is not captured as reliably as exposed land or sand, so some outputs may be simplified or filtered where water creates misleading results.",
-      "Some models are lighter simplified versions to keep the project smooth and responsive, while the higher-resolution model is available when more detail is needed.",
-      "Different tools answer different questions, so it is normal for one view to be better suited to one task than another."
-    ]
-  },
-  {
-    id: "common-questions",
-    title: "Common Questions and Answers",
-    paragraphs: [
-      "Where should I start? Start with Overview if you are new to the project.",
-      "How do I look at a specific part of the estuary? Open Survey Areas and choose the area you want.",
-      "How do I see a cross-section through the ground? Open an area and choose Sections.",
-      "How do I compare two views? Open Compare and then choose Single View, Overlay, Swipe, or Highlight Change.",
-      "How do I understand sandbar gain or loss? Open Volume Change when a measured comparison has been prepared.",
-      "Where do I learn about the project itself? Open Information for the stable story or Survey Notes for round-specific learning."
-    ]
-  }
-];
-
-const SURVEY_SPECIFIC_OVERVIEW = {
-  "2026-03-22": {
-    heroTitle: "What the first full scan taught us",
-    heroText: "This survey-specific view turns the baseline scan into a lessons-learned record. It keeps the general project story separate from what the team actually discovered while running the first full estuary survey.",
-    storyTitle: "Survey Round 1 Learnings",
-    contentsSubtext: "Use this view to track what worked, what slowed the team down, and what changed in the field approach afterwards.",
-    glance: [
-      ["Survey window", "22-23 Mar 2026"],
-      ["What it proved", "Full-estuary coverage was workable"],
-      ["Main friction", "Access and timing took longer than expected"],
-      ["Key learning", "Route planning had to follow the tide more tightly"],
-      ["Best outcome", "Repeatable outputs across all 8 areas"],
-      ["What changed next", "The April repeat used a much smarter route"]
-    ],
-    story: [
-      {
-        id: "round1-purpose",
-        title: "What Survey Round 1 Proved",
-        paragraphs: [
-          "The first full scan showed that the estuary could be surveyed as one joined-up monitoring programme rather than a set of disconnected experiments.",
-          "It also proved that the outputs were worth chasing. The imagery, sections, and repeat-survey comparisons all had real value once the areas had been processed and lined up properly."
-        ]
-      },
-      {
-        id: "round1-what-worked",
-        title: "What Worked Well",
-        paragraphs: [
-          "The baseline round captured all eight monitored areas and created a proper starting point for repeat survey work.",
-          "It also highlighted which areas were strongest near low tide, which areas held water for longer, and where the sandbars and exposed surfaces were most useful for future change tracking."
-        ]
-      },
-      {
-        id: "round1-what-did-not",
-        title: "What Did Not Work So Well",
-        paragraphs: [
-          "The first full scan took longer on the ground than expected. Access, parking, walking time, and moving between both sides of the estuary all had a bigger effect on the day than the desk planning suggested.",
-          "That meant some areas drifted away from their ideal tide windows, even though the technical flying itself was successful."
-        ]
-      },
-      {
-        id: "round1-lessons",
-        title: "What We Learned From The First Scan",
-        paragraphs: [
-          "The biggest lesson was that route planning matters just as much as the flying settings. Tide timing, launch points, travel time, and safe access all needed to be treated as part of the survey method, not as side details.",
-          "That baseline experience is what shaped the much more deliberate April repeat route."
-        ]
-      },
-      {
-        id: "round1-next-time",
-        title: "What Could Be Improved Next Time",
-        paragraphs: [
-          "Future rounds needed cleaner day planning, better grouping of nearby areas, and a more tactical approach to when each side of the estuary should be surveyed.",
-          "That is exactly what Survey Round 2 started testing."
-        ]
-      }
-    ]
-  },
-  "2026-04-18": {
-    heroTitle: "What Survey Round 2 improved in the field",
-    heroText: "This survey-specific view captures what the April repeat taught us. The permanent project story stays the same, but this round shows how the team refined access, route planning, and tide timing after learning from the first full scan.",
-    storyTitle: "Survey Round 2 Learnings",
-    contentsSubtext: "Use this view to see what went more smoothly, which tide windows were strongest, and how the route would be changed again for the next survey.",
-    glance: [
-      ["Survey window", "18-19 Apr 2026"],
-      ["Day 1 focus", "Wadebridge down towards Padstow"],
-      ["Day 2 focus", "Outer estuary, ferry crossing, and Rock side"],
-      ["Best low-water blocks", "Area 4 Day 1 and Area 3 Day 2"],
-      ["Main issue", "Outer areas still drifted later than ideal"],
-      ["Next change", "Split future days more clearly by estuary side"]
-    ],
-    story: [
-      {
-        id: "round2-overview",
-        title: "What Survey Round 2 Was Trying To Improve",
-        paragraphs: [
-          "Survey Round 2 built directly on the first full scan. By April, the team already understood more about where to park, where to launch from, which parts of the estuary emptied first, and how long the travel links between areas really took.",
-          "The aim was not just to repeat March, but to improve the tide timing and make better use of the estuary-side access patterns that had become clearer after the baseline round."
-        ]
-      },
-      {
-        id: "round2-day1",
-        title: "Day 1 Worked Well Down The Estuary",
-        paragraphs: [
-          "Day 1 started early at the Wadebridge end, which worked well because the water had already started draining and the sandbars were becoming visible. That let the team move through Areas 8 and 7 at a reasonable speed and get back to Area 4 close to low tide, which was one of the key goals for the day.",
-          "By the time the team reached Area 6, the water was still low enough to walk onto the central sandbar. That would have been impossible, or at least far less practical, during the first scan, so it was a clear sign that the repeat route and timing were already improving."
-        ]
-      },
-      {
-        id: "round2-day2",
-        title: "Day 2 Was More Experimental",
-        paragraphs: [
-          "Day 2 tested a different movement pattern because the team needed to work across both sides of the estuary. The route still used driving, but also brought in the ferry crossing, which helped connect Hawker's Cove, Rock Beach, and the lower-estuary areas in a more flexible way.",
-          "Area 1 was still surveyed well before low tide because the water remained high for longer than hoped, even after waiting around to expose more of the Gimbob area. Rock Beach then worked better once the ferry crossing was used, and Porthilly Cove improved again because access from the small church avoided the worst of the squelchy mud."
-        ]
-      },
-      {
-        id: "round2-what-worked",
-        title: "What Worked Better Than The First Scan",
-        paragraphs: [
-          "The second round was smoother because the team was no longer guessing the route. The practical knowledge from the first survey made the driving, stopping, launch planning, and area grouping much more efficient.",
-          "Area 4 on Day 1 and Area 3 on Day 2 were especially strong because they sat much closer to low water and gave cleaner exposed-ground comparison windows."
-        ]
-      },
-      {
-        id: "round2-what-did-not",
-        title: "What Still Did Not Land Perfectly",
-        paragraphs: [
-          "The outer areas were still the hardest to line up perfectly with low tide. Daymer Bay ended up later than ideal, and by that point the water had already pushed back in enough to make the repeat window less useful than hoped.",
-          "Area 1 also stayed higher in the tide cycle than would be ideal for maximum exposure, which means some features would still be worth revisiting later in the tide if future logistics allow it."
-        ]
-      },
-      {
-        id: "round2-next-time",
-        title: "How The Route Would Change Next Time",
-        paragraphs: [
-          "Looking back, the next repeat survey would probably split the estuary days more deliberately. One day would start at Daymer Bay, then move through Rock Beach and the ferry crossing, and then catch the Wadebridge / Camel Trail side later because Area 8 appears to stay exposed for longer.",
-          "The other day would begin on the Padstow side, aim to hit Area 4 shortly before low tide, and then work upriver through Areas 7 and 6 while the water is still well out. That should give a cleaner match between access logic and the tide window for each side of the estuary."
-        ]
-      }
-    ]
-  },
-  "2026-06-16": {
-    heroTitle: "What Survey Round 3 proved about route planning",
-    heroText: "This survey-specific view captures what the June repeat taught us after a longer-than-intended gap between rounds. More importantly, it shows that the route logic for future scans is now much clearer and more reliable.",
-    storyTitle: "Survey Round 3 Learnings",
-    contentsSubtext: "Use this view to see how the team handled the long wait for a weather window, what changed in the route planning, and why this round now feels like a turning point for future survey days.",
-    glance: [
-      ["Survey window", "16-17 Jun 2026"],
-      ["Main delay", "Long gap caused by weather and tide mismatch"],
-      ["Day 1 route", "Tregirls Beach first, then work inland"],
-      ["Day 2 route", "Daymer Bay first, then work inland"],
-      ["Best outcome", "Completed in two days despite uncertain weather"],
-      ["Next change", "Keep the new outward-to-inland route pattern"]
-    ],
-    story: [
-      {
-        id: "round3-overview",
-        title: "Why This Round Mattered So Much",
-        paragraphs: [
-          "Survey Round 3 followed a much longer gap than originally intended. The aim had been to keep the repeat interval closer to around 30 days, but the tides and the weather did not align well enough for that to happen.",
-          "By the time the June survey went ahead, the gap had stretched to roughly 50 days. That made it important to return to the estuary and secure the next full dataset, even though the forecast window became less comfortable only a few days before the survey."
-        ]
-      },
-      {
-        id: "round3-weather",
-        title: "Weather Stayed Under Review The Whole Time",
-        paragraphs: [
-          "The forecast had looked more favourable earlier on, but the workable window narrowed shortly before the survey. Even so, the decision was made to proceed, with the understanding that a third day would be used if necessary rather than lose the opportunity altogether.",
-          "In practice, both days remained workable. There were gusts, some very light rain, and a few moments where low cloud or mist triggered visibility warnings from the drone, but the aircraft performed well overall and the imagery stayed clear enough to keep the survey moving."
-        ]
-      },
-      {
-        id: "round3-route",
-        title: "The Route Was Reworked Around How The Estuary Fills",
-        paragraphs: [
-          "One of the biggest changes in June was the route logic. In earlier rounds, some of the more seaward areas had often been left until later, but by that stage the lower estuary can refill quickly enough to weaken the comparison window.",
-          "For this round, Day 1 began at Tregirls Beach and then worked inland. Day 2 began at Daymer Bay and then also worked inland. That meant the more seaward blocks were captured earlier, around an hour and a half before low tide, giving a better chance of seeing more of Doom Bar, the beaches, and the outer exposed ground before the water pushed back in."
-        ]
-      },
-      {
-        id: "round3-tide-window",
-        title: "The Tide Strategy Was More Deliberate",
-        paragraphs: [
-          "The normal target window still sits roughly around two hours before to two hours after low tide, but this round showed that the outer areas benefit from being flown earlier within that range. Starting them well before low water gave a stronger view of the sea-edge features than waiting until later in the cycle.",
-          "At the same time, the inland areas such as Areas 7 and 8 appear to remain usable for longer after low tide because the estuary refills there more slowly. That balance worked well across both June survey days and helped the team use the tide more effectively than in the earlier rounds."
-        ]
-      },
-      {
-        id: "round3-access",
-        title: "Access Planning Also Became Clearer",
-        paragraphs: [
-          "The June round also helped confirm more of the on-the-ground access method. Some cycling was still used, but less than before, and the Wadebridge block was tested by parking in Wadebridge and walking down instead.",
-          "That worked, although the end of Day 2 showed that the walk was longer than it feels when moving by bike. Even so, the round added more confidence about where to leave the Camel Trail, where to drop onto the estuary, and how those access choices affect the timing of the day."
-        ]
-      },
-      {
-        id: "round3-what-it-proved",
-        title: "What Survey Round 3 Proved For Future Surveys",
-        paragraphs: [
-          "The biggest success of this round is that the route planning now feels much more settled. It matters less which calendar day is called Day 1 or Day 2, because the team now understands the sequence that works best through the estuary.",
-          "The June survey showed that the outward-to-inland route is the stronger pattern, that the upper estuary often provides calmer flying conditions than the sea edge, and that the team now has a much clearer playbook for future repeat rounds. Completing the whole survey in two days, despite the uncertainty leading into it, was a strong result."
-        ]
-      }
-    ]
-  }
-};
-
-const OVERVIEW_GLANCE_BY_SURVEY = {
-  "2026-03-22": [
-    ["High tide reference", "08:22 Day 1 - 7.45 m | 07:54 Day 2 - 7.35 m"],
-    ["Total mapped area", "7.25 km2"],
-    ["Survey dates", "22-23 March 2026"],
-    ["Low tide reference", "13:47 Day 1 - 0.53 m | 14:23 Day 2 - 0.95 m"],
-    ["Images captured", "6,210 photos"],
-    ["Air time overall", "338.86 minutes"]
-  ],
-  "2026-04-18": [
-    ["High tide reference", "06:55 Day 1 - 7.53 m | 07:39 Day 2 - 7.53 m"],
-    ["Total mapped area", "7.25 km2"],
-    ["Survey dates", "18-19 April 2026"],
-    ["Low tide reference", "12:56 Day 1 - -0.15 m | 13:35 Day 2 - -0.09 m"],
-    ["Images captured", "6,102 photos"],
-    ["Air time overall", "320.80 minutes"]
-  ],
-  "2026-06-16": [
-    ["High tide reference", "Survey-specific high tide summary pending"],
-    ["Total mapped area", "7.25 km2"],
-    ["Survey dates", "16-17 June 2026"],
-    ["Low tide reference", "13:22 Day 1 (provisional) | 14:10 Day 2 (provisional)"],
-    ["Images captured", "6,405 photos"],
-    ["Air time overall", "321.22 minutes"],
-    ["Operational result", "Completed in two days"]
-  ]
-};
-
-function overviewGlanceForSurvey(surveyId) {
-  return OVERVIEW_GLANCE_BY_SURVEY[surveyId] || OVERVIEW_GLANCE_BY_SURVEY["2026-03-22"];
-}
-
-function setOverviewGlance(glance = []) {
-  els.metricGrid.innerHTML = glance.map(([label, value]) => metric(label, value, "")).join("");
-  if (!els.overviewGlanceGrid) return;
-  els.overviewGlanceGrid.innerHTML = glance.map(([label, value]) => `
-    <article class="card overview-glance-card">
-      <p class="muted">${escapeHtml(label)}</p>
-      <h3>${escapeHtml(value)}</h3>
-    </article>
-  `).join("");
-}
-
-function glanceRowsWithTideSummary(glance = [], tideSummary = null) {
-  if (!tideSummary) return glance;
-  return glance.map(([label, value]) => {
-    if (label === "High tide reference" && tideSummary.high) return [label, tideSummary.high];
-    if (label === "Low tide reference" && tideSummary.low) return [label, tideSummary.low];
+  const nextGlance = glance.map(([label, value]) => {
+    if (label === "High tide reference" && summary.high) {
+      return [label, summary.high];
+    }
+    if (label === "Low tide reference" && summary.low) {
+      return [label, summary.low];
+    }
     return [label, value];
   });
-}
 
-async function enhanceOverviewGlanceWithConfirmedTides(survey, glance, overviewMode) {
-  const tideSummary = await confirmedSurveyTideSummary(survey);
-  if (!tideSummary) return;
-  if (state.activeTab !== "overview") return;
-  if (state.surveyId !== survey.id) return;
-  if (state.overviewMode !== overviewMode) return;
-  setOverviewGlance(glanceRowsWithTideSummary(glance, tideSummary));
+  setOverviewGlance(nextGlance);
 }
 
 async function confirmedSurveyTideSummary(survey) {
@@ -2115,9 +1862,13 @@ async function confirmedSurveyTideSummary(survey) {
 
   const request = (async () => {
     try {
+      const projectEnvironment = currentProjectEnvironment();
       const url = new URL("/api/tides", window.location.origin);
       url.searchParams.set("start_date", survey.dateFrom);
       url.searchParams.set("end_date", survey.dateTo);
+      if (projectEnvironment.tide?.latitude) url.searchParams.set("lat", projectEnvironment.tide.latitude);
+      if (projectEnvironment.tide?.longitude) url.searchParams.set("lon", projectEnvironment.tide.longitude);
+      if (projectEnvironment.tide?.datum) url.searchParams.set("datum", projectEnvironment.tide.datum);
       const response = await fetch(url.toString());
       if (!response.ok) {
         throw new Error(`Tide lookup failed with status ${response.status}`);
@@ -2205,34 +1956,112 @@ function formatTideClock(value) {
   });
 }
 
+function overviewGlanceForSurvey(surveyId) {
+  const surveySpecificGlance = currentProjectContent()?.surveySpecificOverview?.[surveyId]?.glance;
+  if (Array.isArray(surveySpecificGlance) && surveySpecificGlance.length) {
+    return surveySpecificGlance;
+  }
+
+  const survey = currentProject()?.surveys?.find((item) => item.id === surveyId) || currentSurvey();
+  if (!survey) {
+    return [];
+  }
+
+  return [
+    ["Survey window", survey.shortDate || survey.label || survey.id],
+    ["Status", survey.status || "Survey loaded"],
+    ["Readiness", survey.readiness || "Assets linked"],
+    ["Comparison baseline", survey.comparisonBaseline || "Baseline round"],
+    ["Asset folder", survey.assetFolder || "n/a"],
+    ["Data folder", survey.dataFolder || "n/a"]
+  ];
+}
+
+function setOverviewGlance(glance = []) {
+  const rows = Array.isArray(glance) ? glance : [];
+  const metricRows = rows.slice(0, 6);
+
+  if (els.metricGrid) {
+    els.metricGrid.innerHTML = metricRows.map(([label, value]) => metric(label, value, "")).join("");
+  }
+
+  if (!els.overviewGlanceGrid) {
+    return;
+  }
+
+  if (!rows.length) {
+    els.overviewGlanceGrid.innerHTML = "";
+    els.overviewGlanceGrid.classList.add("hidden");
+    els.overviewGlanceGrid.setAttribute("aria-hidden", "true");
+    return;
+  }
+
+  els.overviewGlanceGrid.innerHTML = rows.map(([label, value]) => `
+    <article class="card overview-glance-card">
+      <p class="muted">${escapeHtml(label)}</p>
+      <h3>${escapeHtml(value)}</h3>
+    </article>
+  `).join("");
+  els.overviewGlanceGrid.classList.remove("hidden");
+  els.overviewGlanceGrid.setAttribute("aria-hidden", "false");
+}
+
 function getOverviewModePayload(project) {
-  const informationPayload = {
-    heroTitle: "Understanding how the Padstow Estuary changes over time",
-    heroText: "This information page explains what the project is, why it is being carried out, how the surveys were undertaken, and what limits or practical realities shape the outputs.",
+  const genericInformationStory = [
+    {
+      id: "about",
+      title: "About this project",
+      paragraphs: [
+        "This monitoring project tracks how the site changes over time using repeat surveys and comparable visual outputs.",
+        "Project-specific background, survey method, and interpretation guidance can be added in the project content files."
+      ]
+    }
+  ];
+  const genericHelpStory = [
+    {
+      id: "quick-start",
+      title: "Quick start",
+      paragraphs: [
+        "Start with Overview to understand the current survey round and the monitored areas.",
+        "Then use the area tools to compare imagery, inspect sections, and review any measured change products available for the selected project."
+      ]
+    }
+  ];
+  const informationPayload = enrichOverviewPayload(
+    project?.content?.overviewModes?.information,
+    {
+    heroTitle: `Understanding the ${project?.name || "monitoring project"}`,
+    heroText: "This page explains the purpose of the project, how the surveys are being used, and any important context needed to interpret the outputs.",
     storyTitle: "Project Information",
-    contentsSubtext: "Use this index to move through the project story, survey method, operational context, and data limitations.",
-    contents: INFORMATION_STORY.map((section) => ({
+    contentsSubtext: "Use this index to move through the project story, survey method, and data context.",
+    contents: genericInformationStory.map((section) => ({
       title: section.title,
       summary: section.paragraphs[0]
     })),
     glance: overviewGlanceForSurvey(state.surveyId),
-    story: INFORMATION_STORY
-  };
+    story: genericInformationStory
+    }
+  );
 
-  const helpPayload = {
-    heroTitle: "How to move around the monitoring system confidently",
-    heroText: "This help page explains where to start, what each menu section does, how the area tools work, what each view shows, and the most common questions people are likely to have when using the project.",
+  const helpPayload = enrichOverviewPayload(
+    project?.content?.overviewModes?.help,
+    {
+    heroTitle: "How to use the monitoring platform",
+    heroText: "This help page explains where to start, what each menu section does, and how to use the main monitoring views for the selected project.",
     storyTitle: "Project Help",
-    contentsSubtext: "Use this index to move through the navigation guide, area tools, quick-start advice, and common questions.",
-    contents: HELP_STORY.map((section) => ({
+    contentsSubtext: "Use this index to move through the navigation guide and quick-start advice.",
+    contents: genericHelpStory.map((section) => ({
       title: section.title,
       summary: section.paragraphs[0]
     })),
     glance: overviewGlanceForSurvey(state.surveyId),
-    story: HELP_STORY
-  };
+    story: genericHelpStory
+    }
+  );
 
-  const surveySpecificPayload = SURVEY_SPECIFIC_OVERVIEW[state.surveyId] || {
+  const surveySpecificPayload = enrichOverviewPayload(
+    project?.content?.surveySpecificOverview?.[state.surveyId],
+    {
     heroTitle: `${currentSurvey().label} field notes`,
     heroText: "This survey-specific view is ready for round-by-round field notes, lessons learned, and route changes as the programme develops.",
     storyTitle: "Survey Notes",
@@ -2255,7 +2084,8 @@ function getOverviewModePayload(project) {
         ]
         }
       ]
-    };
+    }
+  );
 
   surveySpecificPayload.glance = overviewGlanceForSurvey(state.surveyId);
   
@@ -2266,6 +2096,23 @@ function getOverviewModePayload(project) {
     return surveySpecificPayload;
   }
   return informationPayload;
+}
+
+function enrichOverviewPayload(projectPayload, fallbackPayload) {
+  const merged = {
+    ...(fallbackPayload || {}),
+    ...(projectPayload || {})
+  };
+  const story = Array.isArray(merged.story) ? merged.story : [];
+  return {
+    ...merged,
+    contents: Array.isArray(merged.contents) && merged.contents.length
+      ? merged.contents
+      : story.map((section) => ({
+        title: section.title,
+        summary: Array.isArray(section.paragraphs) ? (section.paragraphs[0] || "") : ""
+      }))
+  };
 }
 
 function surveyShortLabel() {
@@ -2858,21 +2705,28 @@ function renderWorkflow() {
 function renderWeather() {
   const project = currentProject();
   const survey = currentSurvey();
+  const projectEnvironment = currentProjectEnvironment();
   const windowRange = weatherWindowForSurvey(project.surveys, survey.id);
   const surveyDates = [survey.dateFrom, survey.dateTo]
     .filter(Boolean)
     .filter((value, index, array) => array.indexOf(value) === index);
 
   els.weatherSummary.textContent = `${survey.label} is shown with a focused weather and tide window from ${formatDashboardDate(windowRange.start)} to ${formatDashboardDate(windowRange.end)}. Survey markers are shown for the selected survey dates only.`;
+  if (els.weatherFrame) {
+    els.weatherFrame.title = `${project.name || "Project"} weather and tide dashboard`;
+  }
 
   const params = new URLSearchParams({
-    location: project.site?.name || environmentalContext.defaultLocationName,
+    location: project.site?.name || projectEnvironment.defaultLocationName || environmentalContext.defaultLocationName,
     start: windowRange.start,
     end: windowRange.end,
     surveys: surveyDates.join(","),
     mode: "daily",
     limitDays: "92"
   });
+  if (projectEnvironment.tide?.latitude) params.set("lat", projectEnvironment.tide.latitude);
+  if (projectEnvironment.tide?.longitude) params.set("lon", projectEnvironment.tide.longitude);
+  if (projectEnvironment.tide?.datum) params.set("datum", projectEnvironment.tide.datum);
   const src = `./weather-dashboard.html?${params.toString()}`;
   if (state.weatherFrameSrc !== src) {
     state.weatherFrameSrc = src;
@@ -2881,7 +2735,7 @@ function renderWeather() {
 }
 
 function configuredPanoramaEmbed(surveyId, areaId) {
-  const embedsBySurvey = projectConfig.branding?.panoramaEmbedsBySurvey || {};
+  const embedsBySurvey = currentProjectBranding()?.panoramaEmbedsBySurvey || {};
   const directMatch = embedsBySurvey?.[surveyId]?.[areaId];
   if (directMatch) {
     return directMatch;
@@ -2892,111 +2746,12 @@ function configuredPanoramaEmbed(surveyId, areaId) {
   return fallbackMatch || "";
 }
 
-const PANORAMA_AREA_GUIDES = {
-  area1: {
-    summary: "Outer-estuary panorama focused on Hawker's Cove, Tregirls Beach, and the exposed Doom Bar edge.",
-    stats: [
-      ["Main focus", "Outer beach and bar edge", "Use this view to read how the lower estuary opens out towards the sea."],
-      ["Best for", "Early exposure checks", "Helpful for seeing how much of the outer sand and beach face was visible during capture."]
-    ],
-    details: [
-      ["What to look for", "Look across the outer bar, beach width, and the exposed edge of the lower estuary where tidal windows change quickly."],
-      ["Why it matters", "This is one of the clearest places to explain how survey timing affects visible sand extent, especially before low water."],
-      ["Client takeaway", "A wider exposed beach or bar here usually points to stronger low-tide access and a better view of outer-estuary change."]
-    ]
-  },
-  area2: {
-    summary: "Daymer Bay panorama showing the estuary entrance margin and the broad beach surface on the north side.",
-    stats: [
-      ["Main focus", "Entrance beach surface", "Best used for reading broad beach shape and shoreline position."],
-      ["Best for", "Comparing sand spread", "Helpful for seeing whether sand is sitting higher, wider, or further seaward than before."]
-    ],
-    details: [
-      ["What to look for", "Look at the width of exposed sand, the line of wet versus dry beach, and the overall shape of the entrance margin."],
-      ["Why it matters", "This area gives a strong visual read on how the entrance beach is presenting from one survey round to the next."],
-      ["Client takeaway", "If the exposed surface here appears broader or more continuous, it usually supports a build-up story rather than local erosion."]
-    ]
-  },
-  area3: {
-    summary: "Central entrance panorama around Doom Bar, useful for understanding bar shape, channel position, and change through time.",
-    stats: [
-      ["Main focus", "Doom Bar form", "Use this area to read bar shape, crest position, and nearby channel behaviour."],
-      ["Best for", "Visible movement checks", "Helpful for spotting whether sand has shifted, stretched, or narrowed between rounds."]
-    ],
-    details: [
-      ["What to look for", "Look for changes in the bar outline, the apparent high points, and how the channel edge sits against the sand body."],
-      ["Why it matters", "This is one of the most legible places for clients to see estuary movement without needing to read a graph first."],
-      ["Client takeaway", "A bar that looks fuller and more continuous over several rounds supports consistent build-up, while a broken or cut-back shape suggests redistribution or erosion."]
-    ]
-  },
-  area4: {
-    summary: "Harbour reach panorama covering the main low-tide central estuary view where exposed sandbars are easiest to compare.",
-    stats: [
-      ["Main focus", "Central estuary bars", "Use this panorama to compare the main exposed sand surfaces around low water."],
-      ["Best for", "Core repeat comparisons", "This is one of the strongest client-facing views for explaining visible change over time."]
-    ],
-    details: [
-      ["What to look for", "Look at bar width, exposed channel margins, and whether the central surfaces appear higher, flatter, or more cut through."],
-      ["Why it matters", "This area often sits in one of the cleanest low-tide windows, so the exposed landform is easier to compare round to round."],
-      ["Client takeaway", "If change is consistent here as well as in the section graphs, it gives stronger confidence that the broader central estuary is shifting rather than just one local patch."]
-    ]
-  },
-  area5: {
-    summary: "Porthilly Cove panorama focused on the quieter inner transition zone between beach edge, mudflat, and returning water.",
-    stats: [
-      ["Main focus", "Cove edge and mudflat", "Useful for reading subtle shoreline adjustments in a more sheltered part of the estuary."],
-      ["Best for", "Quieter change signals", "This view helps show smaller shape changes that are easier to miss in the more dynamic outer areas."]
-    ],
-    details: [
-      ["What to look for", "Look at the cove edge, the outline of exposed mud or sand, and how far the open surface reaches into the shelter of the cove."],
-      ["Why it matters", "Because this area is calmer, repeated change here can be a useful sign that the estuary is gradually reorganising rather than only reacting at the entrance."],
-      ["Client takeaway", "Subtle expansion or retreat in this cove can help explain whether material is settling into sheltered zones or being stripped back out."]
-    ]
-  },
-  area6: {
-    summary: "Central sandbar panorama showing one of the key comparison zones where flood water can quickly change access after low tide.",
-    stats: [
-      ["Main focus", "Sandbar crest and cut-throughs", "Use this view to examine exposed bar shape and the low channels that begin to refill first."],
-      ["Best for", "Post-low-tide response", "Helpful for understanding how quickly the visible landform starts to change once water returns."]
-    ],
-    details: [
-      ["What to look for", "Look for bar height, the position of shallow cut-throughs, and where returning water begins to break the exposed surface apart."],
-      ["Why it matters", "This is a strong area for explaining that apparent change can come from both real surface movement and the timing of flood water."],
-      ["Client takeaway", "If the bar stays broad and high across rounds, that suggests resilience or build-up; if channels open earlier or cut deeper, it can point to weakening or redistribution."]
-    ]
-  },
-  area7: {
-    summary: "Upper-inner estuary panorama showing a calmer reach where late-day survey windows still give useful comparisons as the tide returns.",
-    stats: [
-      ["Main focus", "Inner-estuary margins", "Useful for reading how exposed edges and quieter sediment zones are holding their shape."],
-      ["Best for", "Settling-zone checks", "This area helps show whether material is accumulating further inland rather than only at the mouth."]
-    ],
-    details: [
-      ["What to look for", "Look at the edge lines of exposed sediment, the width of the inner flats, and any signs that channels are tightening or spreading."],
-      ["Why it matters", "This reach often changes more gently than the entrance, so repeated patterns here can be especially informative."],
-      ["Client takeaway", "Steady build-up inland can suggest sediment is continuing to settle up-estuary, while retreating edges may point to reworking or wash-back."]
-    ]
-  },
-  area8: {
-    summary: "Wadebridge reach panorama covering the upper estuary where broad mudflat and channel-edge relationships are easiest to read.",
-    stats: [
-      ["Main focus", "Upper-estuary flats", "Use this panorama to compare how much of the upper estuary is exposed and where water is still holding."],
-      ["Best for", "Upper-reach context", "Helpful for explaining how the inland end of the system behaves differently from the outer mouth."]
-    ],
-    details: [
-      ["What to look for", "Look at the width of exposed upper flats, the channel edge position, and how much standing water remains across the reach."],
-      ["Why it matters", "This is a useful context view because the upper estuary often responds on a different timing and with different sediment behaviour than the outer sections."],
-      ["Client takeaway", "If the upper reach is staying wetter or narrower than expected, that can explain why some comparisons are weaker here than in the lower estuary."]
-    ]
-  }
-};
-
 function renderPanorama() {
   const survey = currentSurvey();
   const area = currentArea();
   const embedUrl = configuredPanoramaEmbed(survey.id, area.id);
   const hasEmbed = Boolean(String(embedUrl || "").trim());
-  const guide = PANORAMA_AREA_GUIDES[area.id] || {
+  const guide = currentProjectContent()?.panoramaGuides?.[area.id] || {
     summary: `Panorama view for ${area.label}.`,
     stats: [
       ["Main focus", area.label, "Area-specific panorama view."],
@@ -3056,6 +2811,7 @@ async function renderVolumeLegacy() {
     acc.moved += totalMovementVolume(item.gainM3, item.lossM3);
     return acc;
   }, { gain: 0, loss: 0, net: 0, moved: 0 });
+  const comparisonDays = surveyGapDays(baselineSurvey, survey);
 
   const volumeLegendMarkup = `
     <div class="detail-item">
@@ -3113,7 +2869,6 @@ async function renderVolumeLegacy() {
   const baselineLabel = volumeDataset?.baselineSurveyId
     ? (project.surveys.find((item) => item.id === volumeDataset.baselineSurveyId)?.label || baselineSurvey?.label || "baseline survey")
     : (baselineSurvey?.label || "baseline survey");
-  const comparisonDays = surveyGapDays(baselineSurvey, survey);
 
   els.volumeSummary.textContent = `${survey.label} is being compared against ${baselineLabel} for ${area.label}. This view translates elevation-surface change into plain-English cubic metre results for monitored sandbars.`;
   els.volumeImageSummary.textContent = "These aerial views give clients a quick visual before-and-after context for the same monitored area. The cubic metre figures underneath explain how much material was gained or lost.";
@@ -3146,8 +2901,8 @@ async function renderVolumeLegacy() {
   els.volumeMethod.innerHTML = [
     detail("Comparison pair", `${baselineLabel} compared with ${survey.label}.`),
     detail("Calculation method", areaDataset?.method || volumeDataset?.method || "DSM difference raster clipped to fixed sandbar polygons."),
-    detail("Grid note", areaDataset?.cellSize || volumeDataset?.cellSize || "Add cell size or processing note in admin once the calculation has been run."),
-    detail("Area note", areaDataset?.notes || "Add a short survey-specific note here to explain what changed in this part of the estuary.")
+    detail("Grid note", areaDataset?.cellSize || volumeDataset?.cellSize || "Processing note not yet added."),
+    detail("Area note", areaDataset?.notes || "A short note for this area has not been added yet.")
   ].join("");
 
   els.volumeNarrative.innerHTML = polygons.length
@@ -3160,7 +2915,7 @@ async function renderVolumeLegacy() {
     ].join("")
     : [
       detail("Awaiting area figures", `The comparison round exists for ${survey.label}, but no per-sandbar cubic metre figures have been entered yet for ${area.label}.`),
-      detail("Next step", "Use the admin console to add the calculation method, area note, and one row per sandbar.")
+      detail("What to expect next", "Measured method notes and per-sandbar figures will appear here once this comparison package has been completed.")
     ].join("");
 
   els.volumeAreaGrid.innerHTML = polygons.length
@@ -3193,14 +2948,14 @@ async function renderVolumeLegacy() {
             <span class="volume-mini__subvalue muted">${escapeHtml(monthlyRateLabel(item.netM3, comparisonDays, "Equivalent monthly rate"))}</span>
           </div>
         </div>
-        <p>${escapeHtml(item.summary || "No plain-English summary added yet.")}</p>
+        <p>${escapeHtml(item.summary || "Summary to follow.")}</p>
       </article>
     `).join("")
     : `
       <article class="card">
         <p class="muted">${escapeHtml(area.overviewCode)} - ${escapeHtml(area.label)}</p>
         <h3>Ready for sandbar results</h3>
-        <p>This survey pair is set up for volume reporting. Add the per-sandbar cubic metre rows in admin when the QGIS calculation is complete.</p>
+        <p>This survey pair has been prepared for volume reporting. Measured sandbar figures will appear here once they have been processed.</p>
       </article>
     `;
 }
@@ -3284,7 +3039,6 @@ async function renderVolumePrevious() {
   const baselineLabel = volumeDataset?.baselineSurveyId
     ? (project.surveys.find((item) => item.id === volumeDataset.baselineSurveyId)?.label || baselineSurvey?.label || "baseline survey")
     : (baselineSurvey?.label || "baseline survey");
-  const comparisonDays = surveyGapDays(baselineSurvey, survey);
 
   els.volumeSummary.textContent = `${survey.label} is being compared against ${baselineLabel} for ${area.label}. This view translates elevation-surface change into plain-English cubic metre results for monitored sandbars.`;
   els.volumeImageSummary.textContent = "These aerial views give clients a quick visual before-and-after context for the same monitored area. The cubic metre figures underneath explain how much material was gained or lost.";
@@ -3318,15 +3072,15 @@ async function renderVolumePrevious() {
     : [
       metric("Monitored sandbars", String(polygons.length), area.overviewCode),
       metric("Comparison pair", `${baselineSurvey?.shortDate || "Baseline"} to ${survey.shortDate}`, "Imagery ready"),
-      metric("Polygon setup", polygons.length ? "Ready" : "Missing", polygons.length ? "Fixed monitoring zones loaded" : "Add shared sandbar polygons"),
-      metric("Next step", "Add m3 values", "Enter gain, loss, and net per sandbar in admin")
+      metric("Monitoring zones", polygons.length ? "Available" : "Pending", polygons.length ? "Fixed monitoring zones are in place" : "Monitoring zones have not been added to this view yet"),
+      metric("Reported figures", "Awaiting values", "Measured gain, loss, and net figures will appear here once they are available")
     ].join("");
 
   els.volumeMethod.innerHTML = [
     detail("Comparison pair", `${baselineLabel} compared with ${survey.label}.`),
     detail("Calculation method", areaDataset?.method || volumeDataset?.method || "DSM difference raster clipped to fixed sandbar polygons."),
-    detail("Grid note", areaDataset?.cellSize || volumeDataset?.cellSize || "Add cell size or processing note in admin once the calculation has been run."),
-    detail("Area note", areaDataset?.notes || "Add a short survey-specific note here to explain what changed in this part of the estuary.")
+    detail("Grid note", areaDataset?.cellSize || volumeDataset?.cellSize || "Processing note not yet added."),
+    detail("Area note", areaDataset?.notes || "A short note for this area has not been added yet.")
   ].join("");
 
   els.volumeNarrative.innerHTML = hasConfiguredRows
@@ -3341,9 +3095,9 @@ async function renderVolumePrevious() {
       detail("Awaiting area figures", polygons.length
         ? `The comparison round exists for ${survey.label}, and the monitored polygons are loaded for ${area.label}, but no per-sandbar cubic metre figures have been entered yet.`
         : `The comparison round exists for ${survey.label}, but no monitored sandbar polygons or cubic metre figures have been entered yet for ${area.label}.`),
-      detail("Next step", polygons.length
-        ? "Use the admin console to add the gain, loss, and net values for each monitored sandbar."
-        : "Add the shared sandbar polygons first, then enter the gain, loss, and net values in admin.")
+      detail("What to expect next", polygons.length
+        ? "Measured gain, loss, and net figures will appear here once they have been prepared for each monitored sandbar."
+        : "Monitoring zones and measured sandbar figures will appear here once this comparison package is complete.")
     ].join("");
 
   els.volumeAreaGrid.innerHTML = hasConfiguredRows
@@ -3376,7 +3130,7 @@ async function renderVolumePrevious() {
             <span class="volume-mini__subvalue muted">${escapeHtml(monthlyRateLabel(item.netM3, comparisonDays, "Equivalent monthly rate"))}</span>
           </div>
         </div>
-        <p>${escapeHtml(item.summary || "No plain-English summary added yet.")}</p>
+        <p>${escapeHtml(item.summary || "Summary to follow.")}</p>
       </article>
     `).join("")
     : polygons.length
@@ -3384,14 +3138,14 @@ async function renderVolumePrevious() {
         <article class="card">
           <p class="muted">${escapeHtml(area.overviewCode)} - ${escapeHtml(item.id || "")}</p>
           <h3>${escapeHtml(item.label)}</h3>
-          <p>${escapeHtml(item.notes || "Fixed monitoring polygon loaded and ready for cubic metre reporting.")}</p>
+          <p>${escapeHtml(item.notes || "This monitored sandbar is included in the comparison area. Measured results will appear here when available.")}</p>
         </article>
       `).join("")
       : `
         <article class="card">
           <p class="muted">${escapeHtml(area.overviewCode)} - ${escapeHtml(area.label)}</p>
           <h3>Ready for sandbar results</h3>
-          <p>This survey pair is set up for volume reporting. Add the per-sandbar cubic metre rows in admin when the QGIS calculation is complete.</p>
+          <p>This survey pair has been prepared for volume reporting. Measured sandbar figures will appear here once they have been processed.</p>
         </article>
       `;
 }
@@ -3399,6 +3153,7 @@ async function renderVolumePrevious() {
 async function renderVolume() {
   const project = currentProject();
   const currentAreaSelection = currentArea();
+  const singleScanOnly = (project.surveys || []).length < 2;
   const liveAreaIds = liveVolumeAreaIds(project);
   const currentAreaComparisonEntries = Object.entries(project.volumeChangeComparisons || {})
     .filter(([, entry]) => entry?.areas?.[currentAreaSelection.id]);
@@ -3451,11 +3206,20 @@ async function renderVolume() {
   const trendData = await loadTrendData(area.id);
   const comparisonDays = surveyGapDays(baselineSurvey, survey);
 
+  if (singleScanOnly) {
+    els.volumeSandboxBanner.innerHTML = `
+      <div class="detail-item">
+        <strong>Change monitoring status</strong>
+        <p>${escapeHtml(project.singleScanMessage)}</p>
+      </div>
+    `;
+  }
+
   setVolumeUnsupportedAreaLayout(!isLiveArea);
   renderVolumeQuickAreas(isLiveArea ? liveAreaIds : [], currentAreaSelection.id);
   if (els.volumeTrendIntro) {
     els.volumeTrendIntro.textContent = isLiveArea
-      ? `This brings all three survey rounds together so people can see what is steadily building up, steadily lowering, reversing, or settling down across ${currentAreaSelection.label}.`
+      ? `This brings the loaded survey rounds together so people can see what is steadily building up, steadily lowering, reversing, or settling down across ${currentAreaSelection.label}.`
       : "Trend analysis is currently available only in the live areas below.";
   }
 
@@ -3490,19 +3254,8 @@ async function renderVolume() {
     return;
   }
 
-  const [
-    baselineImageSrc,
-    currentImageSrc,
-    previewImageSrc,
-    previewBaselineImageSrc,
-    previewCurrentImageSrc,
-    surveyOneVsTwoHeightSrc,
-    surveyOneVsTwoClassSrc,
-    surveyOneVsThreeHeightSrc,
-    surveyOneVsThreeClassSrc,
-    surveyTwoVsThreeHeightSrc,
-    surveyTwoVsThreeClassSrc
-  ] = await Promise.all([
+  const comparisonPairs = comparisonPairDefinitionsForSurvey(survey.id);
+  const assetResults = await Promise.all([
     baselineSurvey ? resolveExistingAsset(surveyAssetCandidates(project.id, baselineSurvey.id, area.id, "ortho.jpg")) : Promise.resolve(""),
     resolveExistingAsset(surveyAssetCandidates(project.id, survey.id, area.id, "ortho.jpg")),
     previewImageFile
@@ -3523,89 +3276,64 @@ async function renderVolume() {
         baselineSurvey ? surveyAssetPath(project.id, baselineSurvey.id, area.id, previewCurrentImageFile) : ""
       ])
       : Promise.resolve(""),
-    resolveExistingAsset(comparisonAssetCandidates(project.id, area.id, "ab", "height")),
-    resolveExistingAsset(comparisonAssetCandidates(project.id, area.id, "ab", "classification")),
-    resolveExistingAsset(comparisonAssetCandidates(project.id, area.id, "ac", "height")),
-    resolveExistingAsset(comparisonAssetCandidates(project.id, area.id, "ac", "classification")),
-    resolveExistingAsset(comparisonAssetCandidates(project.id, area.id, "bc", "height")),
-    resolveExistingAsset(comparisonAssetCandidates(project.id, area.id, "bc", "classification"))
+    ...comparisonPairs.flatMap((pair) => ([
+      resolveExistingAsset(comparisonAssetCandidates(project.id, area.id, pair.key, "height")),
+      resolveExistingAsset(comparisonAssetCandidates(project.id, area.id, pair.key, "classification"))
+    ]))
   ]);
+
+  const [
+    baselineImageSrc,
+    currentImageSrc,
+    previewImageSrc,
+    previewBaselineImageSrc,
+    previewCurrentImageSrc,
+    ...comparisonAssetResults
+  ] = assetResults;
 
   const baselineImageExists = Boolean(baselineImageSrc);
   const currentImageExists = Boolean(currentImageSrc);
   const useSinglePreview = previewMode === "single" && Boolean(previewImageSrc);
   const usePairedPreview = previewMode === "pair" && Boolean(previewBaselineImageSrc) && Boolean(previewCurrentImageSrc);
-  const allReferenceMaps = [
-    {
-      comparisonKey: "ab",
+  const heightReferenceMaps = comparisonPairs.map((pair, index) => {
+    const title = comparisonPairLabel(pair.fromRoundId, pair.toRoundId);
+    const badge = `Comparison ${index + 1}`;
+    const heightSrc = comparisonAssetResults[index * 2];
+    return heightSrc ? {
+      comparisonKey: pair.key,
       eyebrow: "Height change analysis",
-      title: "Survey 1 vs Survey 2",
-      badge: "Comparison 1",
+      title,
+      badge,
       label: "Measured surface difference",
-      src: surveyOneVsTwoHeightSrc,
-      alt: `${area.label} Survey 1 versus Survey 2 height change analysis`,
-      caption: "Survey 1 versus Survey 2 height change map. Use this to see where the later survey sits higher or lower across the measured footprint."
-    },
-    {
-      comparisonKey: "ac",
-      eyebrow: "Height change analysis",
-      title: "Survey 1 vs Survey 3",
-      badge: "Comparison 2",
-      label: "Measured surface difference",
-      src: surveyOneVsThreeHeightSrc,
-      alt: `${area.label} Survey 1 versus Survey 3 height change analysis`,
-      caption: "Survey 1 versus Survey 3 height change map. This gives the longer-gap view from the March round straight through to June."
-    },
-    {
-      comparisonKey: "bc",
-      eyebrow: "Height change analysis",
-      title: "Survey 2 vs Survey 3",
-      badge: "Comparison 3",
-      label: "Measured surface difference",
-      src: surveyTwoVsThreeHeightSrc,
-      alt: `${area.label} Survey 2 versus Survey 3 height change analysis`,
-      caption: "Survey 2 versus Survey 3 height change map. This isolates what changed between the April and June rounds."
-    },
-    {
-      comparisonKey: "ab",
+      src: heightSrc,
+      alt: `${area.label} ${title} height change analysis`,
+      caption: comparisonReferenceCaption("height", title)
+    } : null;
+  }).filter(Boolean);
+  const classificationReferenceMaps = comparisonPairs.map((pair, index) => {
+    const title = comparisonPairLabel(pair.fromRoundId, pair.toRoundId);
+    const badge = `Comparison ${index + 1}`;
+    const classificationSrc = comparisonAssetResults[(index * 2) + 1];
+    return classificationSrc ? {
+      comparisonKey: pair.key,
       eyebrow: "Gain and loss classes",
-      title: "Survey 1 vs Survey 2",
-      badge: "Comparison 1",
+      title,
+      badge,
       label: "Simplified class view",
-      src: surveyOneVsTwoClassSrc,
-      alt: `${area.label} Survey 1 versus Survey 2 gain and loss classification`,
-      caption: "Survey 1 versus Survey 2 class map. This is the simpler flat-view version for quick client-facing reading."
-    },
-    {
-      comparisonKey: "ac",
-      eyebrow: "Gain and loss classes",
-      title: "Survey 1 vs Survey 3",
-      badge: "Comparison 2",
-      label: "Simplified class view",
-      src: surveyOneVsThreeClassSrc,
-      alt: `${area.label} Survey 1 versus Survey 3 gain and loss classification`,
-      caption: "Survey 1 versus Survey 3 class map. This shows the broader build-up and lowering pattern across the full time gap."
-    },
-    {
-      comparisonKey: "bc",
-      eyebrow: "Gain and loss classes",
-      title: "Survey 2 vs Survey 3",
-      badge: "Comparison 3",
-      label: "Simplified class view",
-      src: surveyTwoVsThreeClassSrc,
-      alt: `${area.label} Survey 2 versus Survey 3 gain and loss classification`,
-      caption: "Survey 2 versus Survey 3 class map. Use this for the latest repeat-survey pattern only."
-    }
-  ].filter((item) => item.src);
+      src: classificationSrc,
+      alt: `${area.label} ${title} gain and loss classification`,
+      caption: comparisonReferenceCaption("classification", title)
+    } : null;
+  }).filter(Boolean);
+  const allReferenceMaps = [...heightReferenceMaps, ...classificationReferenceMaps];
   const availableComparisonKeys = [...new Set(allReferenceMaps.map((item) => item.comparisonKey))];
 
   const totals = configuredPolygons.reduce((acc, item) => {
     acc.gain += Number(item.gainM3 || 0);
     acc.loss += Number(item.lossM3 || 0);
     acc.net += Number(item.netM3 || 0);
-    acc.moved += totalMovementVolume(item.gainM3, item.lossM3);
     return acc;
-  }, { gain: 0, loss: 0, net: 0, moved: 0 });
+  }, { gain: 0, loss: 0, net: 0 });
 
   const setViewerState = (enabled) => {
     els.volumeViewerPanel.classList.toggle("is-hidden", !enabled);
@@ -3664,8 +3392,11 @@ async function renderVolume() {
 
     const pairSummaries = trendPairSummaries(data.stats);
     const trendClasses = sortedTrendClasses(data.stats.trend_classes || []);
+    const activeTrendClasses = trendClasses.filter((item) => Number(item.area_m2 || 0) > 0);
     const topClass = trendClasses[0] || null;
-    state.volumeLightboxLegendItems = trendClasses.map((item) => ({
+    const isCompositeLatestOnlyTrend = data.stats?.classification_inputs?.primary_pair_1?.pair === "Baseline"
+      && data.stats?.classification_inputs?.primary_pair_2?.pair === "C->D composite";
+    state.volumeLightboxLegendItems = activeTrendClasses.map((item) => ({
       label: item.label,
       description: trendClassExplanation(item.key),
       meta: `${formatSquareMetres(item.area_m2)} | ${fixed(item.percent_of_classified_area, 1)}% of the classified area`,
@@ -3679,15 +3410,21 @@ async function renderVolume() {
               <span class="eyebrow">Plain-English takeaway</span>
               <h3>${escapeHtml(data.manifest.summary?.top_trend_class || topClass?.label || "Trend review")}</h3>
             </div>
-            <p class="volume-trend-meta">${escapeHtml(`${formatSquareMetres(data.stats.classified_area?.valid_area_m2 || 0)} reviewed | ${fixed(data.stats.classified_area?.coverage_percent_of_boundary || 0, 1)}% coverage | ${fixed(data.stats.classification_threshold_m || 0, 2)} m threshold`)}</p>
-          </div>
-          <p>${escapeHtml(trendHeadline(topClass))}</p>
+          <p class="volume-trend-meta">${escapeHtml(`${formatSquareMetres(data.stats.classified_area?.valid_area_m2 || 0)} reviewed | ${fixed(data.stats.classified_area?.coverage_percent_of_boundary || 0, 1)}% coverage | ${fixed(data.stats.classification_threshold_m || 0, 2)} m threshold`)}</p>
         </div>
-        <div class="volume-trend-pairs">
-          ${pairSummaries.map((item) => `
-            <article class="volume-trend-pair-card">
-              <p class="eyebrow">${escapeHtml(item.label)}</p>
-              <h3>${escapeHtml(item.readoutTitle)}</h3>
+        <p>${escapeHtml(trendHeadline(topClass))}</p>
+      </div>
+      ${isCompositeLatestOnlyTrend ? `
+        <div class="volume-trend-source-note">
+          <strong>Current Area 4 trend handoff is a latest-change composite</strong>
+          <p>The supplied Area 4 trend bundle uses a baseline placeholder plus a merged Survey Round 3 to Survey Round 4 composite for Beach, Iron Bridge, and Padstow. That means only the latest-change classes are populated here, rather than a full Survey Rounds 1 to 2 to 3 to 4 trend classification.</p>
+        </div>
+      ` : ""}
+      <div class="volume-trend-pairs">
+        ${pairSummaries.map((item) => `
+          <article class="volume-trend-pair-card">
+            <p class="eyebrow">${escapeHtml(item.label)}</p>
+            <h3>${escapeHtml(item.readoutTitle)}</h3>
               <p>${escapeHtml(item.readoutCopy)}</p>
               <div class="volume-card__grid">
                 <div class="volume-mini volume-mini--gain">
@@ -3722,17 +3459,17 @@ async function renderVolume() {
           data-volume-lightbox-eyebrow="Trend analysis map"
           data-volume-lightbox-title="${escapeAttr(area.label)} trend pattern"
           data-volume-lightbox-caption="Expanded trend view with the class legend shown alongside it. Use the zoom controls to inspect the map in more detail."
-          data-volume-lightbox-alt="Trend classification map for ${escapeAttr(area.label)} across all three survey rounds"
+          data-volume-lightbox-alt="Trend classification map for ${escapeAttr(area.label)} across the available survey rounds"
           data-volume-lightbox-legend="trend-map"
         >
           <div class="volume-trend-map__stage">
-            <img src="${escapeAttr(data.imageSrc)}" alt="Trend classification map for ${escapeAttr(area.label)} across all three survey rounds">
+            <img src="${escapeAttr(data.imageSrc)}" alt="Trend classification map for ${escapeAttr(area.label)} across the available survey rounds">
           </div>
         </button>
-        <figcaption class="muted">Use this map as the long-term view. The 3D viewer shows one comparison at a time, while this shows the wider three-round pattern in one place.</figcaption>
+        <figcaption class="muted">Use this map as the long-term view. The 3D viewer shows one comparison at a time, while this shows the wider multi-round pattern in one place.</figcaption>
       </figure>
       <div class="volume-trend-classes">
-        ${trendClasses.map((item) => `
+        ${activeTrendClasses.map((item) => `
           <article class="volume-trend-class-card">
             <div class="volume-trend-class-card__head">
               <span class="volume-trend-swatch" style="background: rgb(${item.color_rgba.slice(0, 3).join(",")});"></span>
@@ -3751,12 +3488,12 @@ async function renderVolume() {
 
   els.volumeSandboxBanner.innerHTML = trendData
     ? `
-      <strong>Live change-analysis package loaded</strong>
-      <p>${escapeHtml(area.label)} now has its own trend-analysis package wired in here, so the page can show the three-round pattern alongside the comparison imagery.</p>
+      <strong>Longer-term trend view available</strong>
+      <p>${escapeHtml(area.label)} includes a trend panel here so the longer multi-round pattern can be viewed alongside the comparison imagery.</p>
     `
     : `
-      <strong>Area setup loaded</strong>
-      <p>${escapeHtml(area.label)} is using the standard change-analysis layout here. Add the trend export if you want the wider three-round pattern panel to appear above the reference maps.</p>
+      <strong>Standard comparison view</strong>
+      <p>${escapeHtml(area.label)} is currently shown with the standard comparison layout. A longer-term trend panel can be added here later if needed.</p>
     `;
 
   if (!baselineSurvey && !volumeDataset) {
@@ -3776,7 +3513,7 @@ async function renderVolume() {
       metric("Selected survey", survey.shortDate, "Current round"),
       metric("Comparison status", "Baseline only", "Change reporting starts on repeat rounds"),
       metric("Current area", area.label, area.overviewCode),
-      metric("Next step", "Add the next survey", "Then upload the sandbar change results")
+      metric("Next stage", "Awaiting repeat comparison", "Volume change reporting begins once a later survey round has been compared")
     ].join("");
     els.volumeMethod.innerHTML = [
       detail("How this will work", "Sandbar change is measured by comparing one elevation surface with another inside fixed sandbar polygons."),
@@ -3809,14 +3546,6 @@ async function renderVolume() {
   const baselineLabel = volumeDataset?.baselineSurveyId
     ? (project.surveys.find((item) => item.id === volumeDataset.baselineSurveyId)?.label || baselineSurvey?.label || "baseline survey")
     : (baselineSurvey?.label || "baseline survey");
-  const hasCompleteLivePackage = Boolean(
-    viewerEmbedUrl
-    || trendData
-    || allReferenceMaps.length
-    || useSinglePreview
-    || usePairedPreview
-    || hasConfiguredRows
-  );
 
   if (!hasConfiguredRows && !useSinglePreview && !usePairedPreview && !allReferenceMaps.length && !trendData) {
     const previewFallbackCards = [];
@@ -3828,7 +3557,7 @@ async function renderVolume() {
         label: "Latest aerial context",
         src: currentImageSrc,
         alt: `${area.label} ${survey.label} aerial view`,
-        caption: `${area.label} is ready for sandbar-change testing, but this area does not yet have a finished preview map or measured results.`
+        caption: `${area.label} does not yet have a finished preview map or measured sandbar figures for this comparison.`
       });
     } else if (baselineImageExists) {
       previewFallbackCards.push({
@@ -3838,12 +3567,12 @@ async function renderVolume() {
         label: "Earlier aerial context",
         src: baselineImageSrc,
         alt: `${area.label} ${baselineLabel} aerial view`,
-        caption: `${area.label} is ready for sandbar-change testing, but this area does not yet have a finished preview map or measured results.`
+        caption: `${area.label} does not yet have a finished preview map or measured sandbar figures for this comparison.`
       });
     }
     renderVolumeReferenceGallery(previewFallbackCards);
-    els.volumeSummary.textContent = `${area.label} is still in testing for sandbar volume change. ${area.label} currently shows the first working preview of what this page will become as more measured results are added.`;
-    els.volumeImageSummary.textContent = "This area is set up for the workflow, but the finished preview map and measured sandbar figures have not been added yet.";
+    els.volumeSummary.textContent = `${area.label} is awaiting its finished sandbar volume comparison outputs. This page will expand as the measured results are added.`;
+    els.volumeImageSummary.textContent = "The finished preview map and measured sandbar figures have not been added yet for this area.";
   } else {
     if (useSinglePreview) {
       renderVolumeReferenceGallery([{
@@ -3924,81 +3653,47 @@ async function renderVolume() {
     : [
       metric("Measured sandbar zones", String(polygons.length), area.overviewCode),
       metric("Comparison pair", `${baselineSurvey?.shortDate || "Baseline"} to ${survey.shortDate}`, "Imagery ready"),
-      metric("Polygon setup", polygons.length ? "Ready" : "Missing", polygons.length ? "Fixed monitoring zones loaded" : "Add shared sandbar polygons"),
-      metric("Next step", "Add m3 values", "Enter added, removed, and overall balance per sandbar in admin")
+      metric("Monitoring zones", polygons.length ? "Available" : "Pending", polygons.length ? "Fixed monitoring zones are in place" : "Monitoring zones have not been added to this view yet"),
+      metric("Reported figures", "Awaiting values", "Measured gain, loss, and net figures will appear here once they are available")
     ].join("");
 
-  els.volumeMethod.innerHTML = hasCompleteLivePackage
-    ? `
-      <div class="volume-explainer">
-        <div class="volume-explainer__block">
-          <strong>What this page is doing now</strong>
-          <p>This page now combines three layers of evidence for ${escapeHtml(area.label)}: the interactive 3D comparison viewer, the longer-term trend map across all three survey rounds, and the flat reference maps underneath.</p>
-        </div>
-        <div class="volume-explainer__block">
-          <strong>How to read it in order</strong>
-          <p>Start with the 3D viewer for detailed shape change, use the trend panel to see whether movement is repeating or reversing across the full survey set, then use the six reference maps for a simpler side-by-side plan-view check.</p>
-        </div>
-        <div class="volume-explainer__block">
-          <strong>How the trend layer is built</strong>
-          <p>The trend panel is not just one before-and-after comparison. It looks across Survey 1, Survey 2, and Survey 3 together so we can separate steady build-up, steady lowering, and areas that changed direction over time.</p>
-        </div>
-        <div class="volume-explainer__block">
-          <strong>Current area note</strong>
-          <p>${escapeHtml(areaDataset?.notes || "Add a short plain-English note here to explain what changed in this part of the estuary.")}</p>
-        </div>
+  els.volumeMethod.innerHTML = `
+    <div class="volume-explainer">
+      <div class="volume-explainer__block">
+        <strong>What this page is doing now</strong>
+        <p>This page now combines three layers of evidence for ${escapeHtml(area.label)}: the interactive 3D comparison viewer, where available the longer-term trend map across the full survey set, and the flat reference maps underneath.</p>
       </div>
-    `
-    : `
-      <div class="volume-explainer">
-        <div class="volume-explainer__block">
-          <strong>What this page is doing now</strong>
-          <p>${escapeHtml(area.label)} is back in the live change-analysis shortcut row, but this area is still waiting for its finished change package. Right now the page uses the available survey imagery as a holding view.</p>
-        </div>
-        <div class="volume-explainer__block">
-          <strong>What is missing</strong>
-          <p>The dedicated 3D viewer, flat comparison exports, trend package, and measured sandbar figures have not been added for this area yet.</p>
-        </div>
-        <div class="volume-explainer__block">
-          <strong>Current area note</strong>
-          <p>${escapeHtml(areaDataset?.notes || "Area-level change-analysis notes have not been added here yet.")}</p>
-        </div>
+      <div class="volume-explainer__block">
+        <strong>How to read it in order</strong>
+        <p>Start with the 3D viewer for detailed shape change, use the trend panel to see whether movement is repeating or reversing across the full survey set, then use the available reference maps for a simpler side-by-side plan-view check.</p>
       </div>
-    `;
+      <div class="volume-explainer__block">
+        <strong>How the trend layer is built</strong>
+        <p>The trend panel is not just one before-and-after comparison. It looks across the full survey set loaded for that area so we can separate steady build-up, steady lowering, and areas that changed direction over time.</p>
+      </div>
+      <div class="volume-explainer__block">
+        <strong>Current area note</strong>
+        <p>${escapeHtml(areaDataset?.notes || "Add a short plain-English note here to explain what changed in this part of the estuary.")}</p>
+      </div>
+    </div>
+  `;
 
-  els.volumeNarrative.innerHTML = hasCompleteLivePackage
-    ? `
-      <div class="volume-explainer">
-        <div class="volume-explainer__block">
-          <strong>What is live right now</strong>
-          <p>${escapeHtml(area.label)} is using the current live change-analysis layout. Where the trend package is present, the page can now bring the three-round story, the change viewer, and the exported flat maps together in one place.</p>
-        </div>
-        <div class="volume-explainer__block">
-          <strong>What the client should take from it</strong>
-          <p>The top half of the page explains where the estuary appears to be repeatedly building up, repeatedly lowering, or changing direction between rounds. The lower reference maps then let people compare whichever survey pairs are ready for this area without leaving the page.</p>
-        </div>
-        <div class="volume-explainer__block">
-          <strong>What comes next</strong>
-          <p>Any future areas can now use this same structure: 3D viewer at the top, trend summary in the middle, and a six-image comparison strip underneath with click-to-expand detail when needed.</p>
-        </div>
+  els.volumeNarrative.innerHTML = `
+    <div class="volume-explainer">
+      <div class="volume-explainer__block">
+        <strong>What is live right now</strong>
+        <p>${escapeHtml(area.label)} is using the current live change-analysis layout. Where the trend package is present, the page can now bring the wider survey story, the change viewer, and the exported flat maps together in one place.</p>
       </div>
-    `
-    : `
-      <div class="volume-explainer">
-        <div class="volume-explainer__block">
-          <strong>What is live right now</strong>
-          <p>The survey imagery is available and the area can be selected again, so people can at least keep their place in the monitoring workflow while the fuller outputs are prepared.</p>
-        </div>
-        <div class="volume-explainer__block">
-          <strong>What the client should take from it</strong>
-          <p>This should currently be read as visual context only, not as a finished change-analysis result. The proper build-up, lowering, and balance story will come in once the measured exports are added.</p>
-        </div>
-        <div class="volume-explainer__block">
-          <strong>What comes next</strong>
-          <p>The next step for ${escapeHtml(area.label)} is to add its comparison imagery, measured figures, and any viewer or trend outputs so it matches the more complete live areas.</p>
-        </div>
+      <div class="volume-explainer__block">
+        <strong>What the client should take from it</strong>
+        <p>The top half of the page explains where the estuary appears to be repeatedly building up, repeatedly lowering, or changing direction between rounds. The lower reference maps then let people compare whichever survey pairs are ready for this area without leaving the page.</p>
       </div>
-    `;
+      <div class="volume-explainer__block">
+        <strong>What comes next</strong>
+        <p>Any future areas can now use this same structure: 3D viewer at the top, trend summary in the middle, and a comparison strip underneath with click-to-expand detail when needed.</p>
+      </div>
+    </div>
+  `;
 
   els.volumeAreaGrid.innerHTML = comparisonReadinessCards(trendData, area.label, availableComparisonKeys);
 }
@@ -4057,6 +3752,8 @@ async function renderAdmin() {
   );
 
   const coverage = await buildSurveyCoverage(project, survey);
+  const onboarding = await deriveProjectOnboarding(project, survey, coverage);
+  renderOnboardingChecklist(els.adminOnboardingSummary, els.adminOnboardingDetails, onboarding);
   els.adminBoardSummary.innerHTML = [
     metric("Complete areas", String(coverage.completeAreas), "All files present"),
     metric("Partial areas", String(coverage.partialAreas), "Some files present"),
@@ -4160,8 +3857,45 @@ function normaliseSectionId(value) {
   return `A${Number(match[1])}-${match[2]}`;
 }
 
+function sectionSuffixFromValue(value) {
+  const text = String(value || "").trim();
+  const appMatch = text.match(/^A(\d+)-?(\d{2})$/i) || text.match(/^A(\d)(\d{2})$/i);
+  if (appMatch) {
+    return appMatch[2];
+  }
+
+  const plainMatch = text.match(/^0*(\d{1,2})$/);
+  if (plainMatch) {
+    return String(Number(plainMatch[1])).padStart(2, "0");
+  }
+
+  const sectionWordMatch = text.match(/^section\s*0*(\d{1,2})$/i);
+  if (sectionWordMatch) {
+    return String(Number(sectionWordMatch[1])).padStart(2, "0");
+  }
+
+  return "";
+}
+
+function csvSectionIdMatches(currentValue, targetValue) {
+  const currentText = String(currentValue || "").trim();
+  const targetText = String(targetValue || "").trim();
+
+  if (!currentText || !targetText) {
+    return false;
+  }
+
+  if (normaliseSectionId(currentText) === normaliseSectionId(targetText)) {
+    return true;
+  }
+
+  const currentSuffix = sectionSuffixFromValue(currentText);
+  const targetSuffix = sectionSuffixFromValue(targetText);
+  return Boolean(currentSuffix && targetSuffix && currentSuffix === targetSuffix);
+}
+
 function cleanCsvCell(value) {
-  const text = String(value ?? "").trim();
+  const text = String(value ?? "").replace(/^\uFEFF/, "").trim();
   if (text.startsWith("\"") && text.endsWith("\"")) {
     return text.slice(1, -1).replace(/""/g, "\"");
   }
@@ -4171,8 +3905,7 @@ function cleanCsvCell(value) {
 async function loadSectionRows(path, sectionId) {
     const response = await fetch(path);
     if (!response.ok) return [];
-    const text = await response.text();
-    const targetSectionId = normaliseSectionId(sectionId);
+    const text = (await response.text()).replace(/^\uFEFF/, "");
     const lines = text.trim().split(/\r?\n/);
     const headers = (lines[0] || "").split(",").map((item) => cleanCsvCell(item).toLowerCase());
     const sectionIndex = headers.indexOf("section_id");
@@ -4194,7 +3927,7 @@ async function loadSectionRows(path, sectionId) {
         height: Number(height),
         distance: Number(distance)
       };
-    }).filter((row) => row.sectionId === targetSectionId);
+    }).filter((row) => csvSectionIdMatches(row.sectionId, sectionId));
   }
 
 async function loadSectionRowsFromCandidates(candidates, sectionId) {
@@ -4741,6 +4474,19 @@ function renderSectionProfileControls(profiles) {
   `).join("");
 }
 
+function sectionChartDisplaySettings(section) {
+  const projectId = currentProject()?.id;
+  const areaId = currentArea()?.id;
+  if (!projectId || !areaId || !section?.id) {
+    return null;
+  }
+  return (
+    SECTION_CHART_DISPLAY_OVERRIDES[`${projectId}:${areaId}:${section.id}`]
+    || DEFAULT_SECTION_CHART_DISPLAY_BY_PROJECT[projectId]
+    || null
+  );
+}
+
 function drawSectionChart(profiles, section, anchorSurveyId = state.surveyId) {
   const width = 960;
   const height = 340;
@@ -4756,8 +4502,12 @@ function drawSectionChart(profiles, section, anchorSurveyId = state.surveyId) {
 
   const minX = Math.min(...allRows.map((row) => row.distance));
   const maxX = Math.max(...allRows.map((row) => row.distance));
+  const displaySettings = sectionChartDisplaySettings(section);
   const minY = Math.min(...allRows.map((row) => row.height));
-  const maxY = Math.max(...allRows.map((row) => row.height));
+  const rawMaxY = Math.max(...allRows.map((row) => row.height));
+  const maxY = Number.isFinite(displaySettings?.maxDisplayHeight)
+    ? Math.min(rawMaxY, displaySettings.maxDisplayHeight)
+    : rawMaxY;
   const xSpan = Math.max(1, maxX - minX);
   const ySpan = Math.max(1, maxY - minY);
   const xTicks = buildAxisTicks(minX, maxX, 4);
@@ -4772,8 +4522,18 @@ function drawSectionChart(profiles, section, anchorSurveyId = state.surveyId) {
   const profileSeries = activeProfiles.map((profile) => {
     const points = profile.rows.map((row, index) => {
       const x = pad.left + ((row.distance - minX) / xSpan) * plotWidth;
-      const y = height - pad.bottom - ((row.height - minY) / ySpan) * plotHeight;
-      return { index, x, y, row };
+      const displayHeight = Number.isFinite(displaySettings?.maxDisplayHeight)
+        ? Math.min(row.height, displaySettings.maxDisplayHeight)
+        : row.height;
+      const y = height - pad.bottom - ((displayHeight - minY) / ySpan) * plotHeight;
+      return {
+        index,
+        x,
+        y,
+        row,
+        displayHeight,
+        isClipped: Number.isFinite(displaySettings?.maxDisplayHeight) && row.height > displaySettings.maxDisplayHeight
+      };
     });
     const buildSegments = (predicate) => {
       const segments = [];
@@ -4796,16 +4556,22 @@ function drawSectionChart(profiles, section, anchorSurveyId = state.surveyId) {
       points,
       measuredSegments: buildSegments((point) => point.row.height !== 0),
       zeroSegments: buildSegments((point) => point.row.height === 0),
+      clippedSegments: buildSegments((point) => point.isClipped),
       hoverRow: nearestSectionRow(profile.rows, hoverDistance)
     };
   });
   const anchorProfile = profileSeries.find((profile) => profile.survey.id === anchorSurveyId) || profileSeries[0];
   const activePoint = anchorProfile?.hoverRow
-    ? {
-        x: pad.left + ((anchorProfile.hoverRow.distance - minX) / xSpan) * plotWidth,
-        y: height - pad.bottom - ((anchorProfile.hoverRow.height - minY) / ySpan) * plotHeight,
-        row: anchorProfile.hoverRow
-      }
+    ? (() => {
+        const activeDisplayHeight = Number.isFinite(displaySettings?.maxDisplayHeight)
+          ? Math.min(anchorProfile.hoverRow.height, displaySettings.maxDisplayHeight)
+          : anchorProfile.hoverRow.height;
+        return {
+          x: pad.left + ((anchorProfile.hoverRow.distance - minX) / xSpan) * plotWidth,
+          y: height - pad.bottom - ((activeDisplayHeight - minY) / ySpan) * plotHeight,
+          row: anchorProfile.hoverRow
+        };
+      })()
     : null;
   const xTickMarkup = xTicks.map((tick) => {
     const x = pad.left + ((tick - minX) / xSpan) * plotWidth;
@@ -4854,14 +4620,28 @@ function drawSectionChart(profiles, section, anchorSurveyId = state.surveyId) {
         return `<polyline fill="none" stroke="${profile.color}" opacity="0.6" stroke-width="${zeroStrokeWidth}" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 5" points="${buildPointString(segment)}"/>`;
       })
       .join("");
+    const clippedLines = displaySettings?.showClippedOverlay
+      ? profile.clippedSegments
+        .filter((segment) => segment.length >= 2)
+        .map((segment) => {
+          const overlayStrokeWidth = isComparisonMode
+            ? (profile.survey.id === anchorSurveyId ? 1.75 : 1.55)
+            : 2.35;
+          return `<polyline fill="none" stroke="rgba(255,255,255,0.92)" stroke-width="${overlayStrokeWidth}" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 5" points="${buildPointString(segment)}"/>`;
+        })
+        .join("")
+      : "";
     const hoverDot = profile.hoverRow && hoverDistance !== null
       ? (() => {
           const x = pad.left + ((profile.hoverRow.distance - minX) / xSpan) * plotWidth;
-          const y = height - pad.bottom - ((profile.hoverRow.height - minY) / ySpan) * plotHeight;
+          const hoverDisplayHeight = Number.isFinite(displaySettings?.maxDisplayHeight)
+            ? Math.min(profile.hoverRow.height, displaySettings.maxDisplayHeight)
+            : profile.hoverRow.height;
+          const y = height - pad.bottom - ((hoverDisplayHeight - minY) / ySpan) * plotHeight;
           return `<circle cx="${fixed(x, 2)}" cy="${fixed(y, 2)}" r="4.2" fill="${profile.color}" stroke="rgba(255,255,255,0.85)" stroke-width="1.5"/>`;
         })()
       : "";
-    return `${zeroLines}${measuredLines}${hoverDot}`;
+    return `${zeroLines}${measuredLines}${clippedLines}${hoverDot}`;
   }).join("");
   const activeLabel = activePoint ? `
     <g>
@@ -5221,7 +5001,11 @@ function sectionMetrics(rows, area, survey, section) {
 }
 
 function areas() {
-  return Array.from({ length: areaSettings.count }, (_, index) => buildArea(index + 1));
+  const configuredAreas = currentProject()?.projectAreaList;
+  if (Array.isArray(configuredAreas) && configuredAreas.length) {
+    return configuredAreas.map((area, index) => buildArea(area, index));
+  }
+  return Array.from({ length: areaSettings.count }, (_, index) => buildArea(index + 1, index));
 }
 
 function surveyOverrideKeys(project, surveyId) {
@@ -5231,9 +5015,38 @@ function surveyOverrideKeys(project, surveyId) {
     .filter((value, index, array) => array.indexOf(value) === index);
 }
 
+function surveyDayLabelForOverrideKey(project, surveyId, overrideKey) {
+  const survey = project?.surveys?.find((item) => item.id === surveyId);
+  if (!survey || !overrideKey) {
+    return "";
+  }
+
+  if (overrideKey === survey.dateFrom || overrideKey === survey.id) {
+    return "Day 1";
+  }
+
+  if (overrideKey === survey.dateTo) {
+    return "Day 2";
+  }
+
+  return "";
+}
+
 function areaOverrideStore(project, surveyId) {
   const stores = surveyOverrideKeys(project, surveyId)
-    .map((key) => project?.surveyAreaOverrides?.[key] || {})
+    .map((key) => {
+      const store = project?.surveyAreaOverrides?.[key] || {};
+      const derivedDay = surveyDayLabelForOverrideKey(project, surveyId, key);
+      return Object.fromEntries(
+        Object.entries(store).map(([areaId, override]) => [
+          areaId,
+          {
+            ...override,
+            day: override?.day || derivedDay || ""
+          }
+        ])
+      );
+    })
     .filter((store) => store && Object.keys(store).length);
   return Object.assign({}, ...stores);
 }
@@ -5242,14 +5055,51 @@ function areaOverride(project, surveyId, areaId) {
   return areaOverrideStore(project, surveyId)?.[areaId] || {};
 }
 
+function nearestPreviousAreaOverride(project, surveyId, areaId) {
+  const currentSurvey = project?.surveys?.find((item) => item.id === surveyId);
+  if (!currentSurvey) {
+    return {};
+  }
+
+  const currentAnchor = currentSurvey.dateFrom || currentSurvey.dateTo || currentSurvey.id;
+  const candidateSurveys = [...(project?.surveys || [])]
+    .filter((item) => item?.id !== surveyId)
+    .filter((item) => {
+      const anchor = item?.dateFrom || item?.dateTo || item?.id;
+      return anchor && anchor <= currentAnchor;
+    })
+    .sort((left, right) => {
+      const leftAnchor = left.dateFrom || left.dateTo || left.id;
+      const rightAnchor = right.dateFrom || right.dateTo || right.id;
+      return rightAnchor.localeCompare(leftAnchor);
+    });
+
+  for (const candidate of candidateSurveys) {
+    const override = areaOverride(project, candidate.id, areaId);
+    if (override && Object.keys(override).length) {
+      return override;
+    }
+  }
+
+  return {};
+}
+
 function effectiveAreaOverview(areaId, surveyId = state.surveyId) {
-  const baseline = BASELINE_AREA_OVERVIEW[areaId] || {};
-  const override = areaOverride(currentProject(), surveyId, areaId);
+  const project = currentProject();
+  const baseline = {
+    ...(BASELINE_AREA_OVERVIEW[areaId] || {}),
+    ...(project?.projectAreaBaselines?.[areaId] || {})
+  };
+  const inheritedOverride = nearestPreviousAreaOverride(project, surveyId, areaId);
+  const override = areaOverride(project, surveyId, areaId);
   return {
     ...baseline,
+    ...inheritedOverride,
     ...override,
     tags: Array.isArray(override.tags)
       ? override.tags
+      : Array.isArray(inheritedOverride.tags)
+        ? inheritedOverride.tags
       : Array.isArray(baseline.tags)
         ? baseline.tags
         : []
@@ -5325,9 +5175,15 @@ function buildAreaLayers(areaLabel) {
   ]));
 }
 
-  function buildArea(number) {
-    const key = `${areaSettings.idPrefix}${number}`;
-    const areaLabel = `Area ${number}`;
+  function buildArea(definition, index = 0) {
+    const isObjectDefinition = typeof definition === "object" && definition !== null;
+    const number = isObjectDefinition
+      ? (Number(definition.number) || Number(String(definition.id || "").replace(/\D+/g, "")) || (index + 1))
+      : Number(definition);
+    const key = isObjectDefinition ? (definition.id || `${areaSettings.idPrefix}${number}`) : `${areaSettings.idPrefix}${number}`;
+    const areaLabel = isObjectDefinition
+      ? (definition.label || definition.title || `Area ${number}`)
+      : `Area ${number}`;
     const overview = effectiveAreaOverview(key);
     const explicitTracks = EXPLICIT_SECTION_IMAGE_TRACKS[key];
     const sectionTracks = explicitTracks?.length
@@ -5335,7 +5191,7 @@ function buildAreaLayers(areaLabel) {
       : sectionSettings.defaultTracks;
   return {
     id: key,
-    overviewCode: `${areaSettings.codePrefix}${number}`,
+    overviewCode: isObjectDefinition ? (definition.overviewCode || `${areaSettings.codePrefix}${number}`) : `${areaSettings.codePrefix}${number}`,
     day: overview?.day || areaSettings.defaultDay,
     label: overview?.title || areaLabel,
     summary: overview?.purpose || `${areaLabel} follows the same shared schema: ortho, DSM, contours, section overlay, and CSV-backed profile data.`,
@@ -5363,7 +5219,7 @@ function buildAreaLayers(areaLabel) {
     tags: overview?.tags || areaSettings.defaultTags,
     statusNote: areaSettings.defaultStatusNote,
     layers: buildAreaLayers(areaLabel),
-    sections: Array.from({ length: sectionSettings.countPerArea }, (_, index) => index + 1).map((section, index) => {
+    sections: Array.from({ length: Number(definition?.sectionCount) || sectionSettings.countPerArea }, (_, index) => index + 1).map((section, index) => {
       const track = sectionTracks[index];
       return {
         id: `A${number}-${String(section).padStart(2, "0")}`,
@@ -5394,13 +5250,6 @@ function liveVolumeAreaIds(project = currentProject()) {
       liveAreaIds.add(areaId);
     });
   });
-  if (project?.id === "padstow-estuary") {
-    ["area1", "area2", "area3", "area4"].forEach((areaId) => {
-      if (areaById(areaId)) {
-        liveAreaIds.add(areaId);
-      }
-    });
-  }
   return [...liveAreaIds].sort((left, right) => left.localeCompare(right));
 }
 
@@ -5454,11 +5303,14 @@ function currentSurvey() {
 }
 
 function weatherWindowForSurvey(surveys, surveyId) {
+  const projectEnvironment = currentProjectEnvironment();
   const current = surveys.find((item) => item.id === surveyId) || surveys[0];
-  const anchor = current?.dateFrom || current?.dateTo || environmentalContext.fallbackSurveyEndDate;
-  const end = current?.dateTo || current?.dateFrom || environmentalContext.fallbackSurveyEndDate;
+  const fallbackSurveyEndDate = projectEnvironment.fallbackSurveyEndDate || environmentalContext.fallbackSurveyEndDate;
+  const weatherWindowMonths = projectEnvironment.weatherWindowMonths || environmentalContext.weatherWindowMonths;
+  const anchor = current?.dateFrom || current?.dateTo || fallbackSurveyEndDate;
+  const end = current?.dateTo || current?.dateFrom || fallbackSurveyEndDate;
   return {
-    start: subtractMonths(anchor, environmentalContext.weatherWindowMonths),
+    start: subtractMonths(anchor, weatherWindowMonths),
     end
   };
 }
@@ -5532,8 +5384,12 @@ function formatSquareMetres(value) {
   return `${number.toLocaleString("en-GB", { maximumFractionDigits: 0 })} m2`;
 }
 
+function currentTrendAreaPaths(areaId) {
+  return currentProjectContent()?.trendAssets?.[areaId] || null;
+}
+
 async function loadTrendData(areaId) {
-  const areaTrendPaths = trendAreaPaths[areaId];
+  const areaTrendPaths = currentTrendAreaPaths(areaId);
   if (!areaTrendPaths) {
     return null;
   }
@@ -5551,6 +5407,14 @@ async function loadTrendData(areaId) {
         manifestResponse.json(),
         statsResponse.json()
       ]);
+      const coveragePercent = Number(
+        stats?.classified_area?.coverage_percent_of_boundary
+        ?? manifest?.summary?.coverage_percent_of_boundary
+        ?? 0
+      );
+      if (!Number.isFinite(coveragePercent) || coveragePercent < TREND_MIN_COVERAGE_PERCENT) {
+        return null;
+      }
       return { manifest, stats, imageSrc };
     })());
   }
@@ -5599,7 +5463,73 @@ function trendRoundIntervalDays(stats, fromRoundId, toRoundId) {
   return Math.round((toMs - fromMs) / 86400000);
 }
 
-function trendPairSummaries(stats) {
+function comparisonPairKey(fromRoundId, toRoundId) {
+  return `${String(fromRoundId || "").toLowerCase()}${String(toRoundId || "").toLowerCase()}`;
+}
+
+function comparisonPairLabel(fromRoundId, toRoundId) {
+  const fromNumber = Number(String(fromRoundId || "").toUpperCase().charCodeAt(0)) - 64;
+  const toNumber = Number(String(toRoundId || "").toUpperCase().charCodeAt(0)) - 64;
+  if (!Number.isFinite(fromNumber) || !Number.isFinite(toNumber) || fromNumber < 1 || toNumber < 1) {
+    return "Survey comparison";
+  }
+  return `Survey ${fromNumber} vs Survey ${toNumber}`;
+}
+
+function comparisonPairDefinitionsForSurvey(surveyId) {
+  const surveyIds = (currentProject()?.surveys || []).map((item) => item.id);
+  const currentIndex = surveyIds.indexOf(surveyId);
+  if (currentIndex === -1) {
+    return COMPARISON_PAIR_DEFS.filter((item) => item.surveyId === surveyId);
+  }
+  return COMPARISON_PAIR_DEFS.filter((item) => {
+    const pairIndex = surveyIds.indexOf(item.surveyId);
+    return pairIndex !== -1 && pairIndex <= currentIndex;
+  });
+}
+
+function comparisonPairDefinitionsForStats(stats) {
+  const roundIds = new Set((stats?.survey_rounds || []).map((item) => item.id));
+  return COMPARISON_PAIR_DEFS.filter((item) => roundIds.has(item.fromRoundId) && roundIds.has(item.toRoundId));
+}
+
+function trendComparisonEntries(stats) {
+  const entries = [];
+  const appendEntry = (source) => {
+    if (!source?.pair || !source?.volume_stats) {
+      return;
+    }
+    const [fromRoundId, toRoundId] = String(source.pair).split("->").map((item) => item.trim().toUpperCase());
+    if (!fromRoundId || !toRoundId) {
+      return;
+    }
+    entries.push({
+      key: comparisonPairKey(fromRoundId, toRoundId),
+      fromRoundId,
+      toRoundId,
+      dateRange: source.date_range || trendRoundDateRange(stats, fromRoundId, toRoundId),
+      intervalDays: source.interval_days ?? trendRoundIntervalDays(stats, fromRoundId, toRoundId),
+      volumeStats: source.volume_stats
+    });
+  };
+
+  appendEntry(stats?.classification_inputs?.primary_pair_1);
+  appendEntry(stats?.classification_inputs?.primary_pair_2);
+  (stats?.classification_inputs?.cumulative_pairs || []).forEach(appendEntry);
+
+  const deduped = new Map();
+  entries.forEach((item) => {
+    if (!deduped.has(item.key)) {
+      deduped.set(item.key, item);
+    }
+  });
+
+  return comparisonPairDefinitionsForStats(stats)
+    .map((definition) => deduped.get(definition.key))
+    .filter(Boolean);
+}
+
+function legacyTrendPairSummaries(stats) {
   const pairAB = stats?.classification_inputs?.primary_pair_1;
   const pairBC = stats?.classification_inputs?.primary_pair_2;
   const pairAC = stats?.classification_inputs?.cumulative_pairs?.[0];
@@ -5632,51 +5562,42 @@ function trendPairSummaries(stats) {
 }
 
 function comparisonAssetCandidates(projectId, areaId, pairKey, assetType) {
-  const pairAssets = {
-    ab: {
-      surveyId: "2026-04-18",
-      height: [
-        `${areaId}_s1_vs_s2_height_change_analysis.png`,
-        `${areaId}_A_vs_B_height_change_analysis.png`,
-        `${areaId}_height_change_analysis.png`,
-        `${areaId}_height_change_analysis.jpg`
-      ],
-      classification: [
-        `${areaId}_s1_vs_s2_gain_loss_classification.png`,
-        `${areaId}_A_vs_B_gain_loss_classification.png`,
-        `${areaId}_gain_loss_classification.png`,
-        `${areaId}_gain_loss_classification.jpg`
-      ]
-    },
-    ac: {
-      surveyId: "2026-06-16",
-      height: [
-        `${areaId}_s1_vs_s3_height_change_analysis.png`,
-        `${areaId}_A_vs_C_height_change_analysis.png`
-      ],
-      classification: [
-        `${areaId}_s1_vs_s3_gain_loss_classification.png`,
-        `${areaId}_A_vs_C_gain_loss_classification.png`
-      ]
-    },
-    bc: {
-      surveyId: "2026-06-16",
-      height: [
-        `${areaId}_s2_vs_s3_height_change_analysis.png`,
-        `${areaId}_B_vs_C_height_change_analysis.png`
-      ],
-      classification: [
-        `${areaId}_s2_vs_s3_gain_loss_classification.png`,
-        `${areaId}_B_vs_C_gain_loss_classification.png`
-      ]
-    }
-  }[pairKey];
-
-  if (!pairAssets) {
+  const pairDefinition = COMPARISON_PAIR_DEFS.find((item) => item.key === pairKey);
+  if (!pairDefinition) {
     return [];
   }
 
-  return (pairAssets[assetType] || []).map((fileName) => surveyAssetPath(projectId, pairAssets.surveyId, areaId, fileName));
+  const pairTag = `${pairDefinition.fromRoundId}_vs_${pairDefinition.toRoundId}`;
+  const legacyPairTag = `${pairDefinition.fromRoundId.toLowerCase()}${pairDefinition.toRoundId.toLowerCase()}`;
+  const fromNumber = pairDefinition.fromRoundId.charCodeAt(0) - 64;
+  const toNumber = pairDefinition.toRoundId.charCodeAt(0) - 64;
+  const pairAssets = assetType === "height"
+    ? [
+      `${areaId}_${pairTag}_height_change_analysis.png`,
+      `${areaId}_${pairTag}_height_change_analysis.jpg`,
+      `${areaId}_s${fromNumber}_vs_s${toNumber}_height_change_analysis.png`,
+      `${areaId}_${legacyPairTag}_height_change_analysis.png`,
+      ...(pairKey === "ab" ? [
+        `${areaId}_height_change_analysis.png`,
+        `${areaId}_height_change_analysis.jpg`
+      ] : [])
+    ]
+    : [
+      `${areaId}_${pairTag}_gain_loss_classification.png`,
+      `${areaId}_${pairTag}_gain_loss_classification.jpg`,
+      `${areaId}_s${fromNumber}_vs_s${toNumber}_gain_loss_classification.png`,
+      `${areaId}_${legacyPairTag}_gain_loss_classification.png`,
+      ...(pairKey === "ab" ? [
+        `${areaId}_gain_loss_classification.png`,
+        `${areaId}_gain_loss_classification.jpg`
+      ] : [])
+    ];
+
+  return pairAssets.flatMap((fileName) => ([
+    projectAssetPath(projectId, "stats", pairDefinition.surveyId, areaId, fileName),
+    projectAssetPath(projectId, "maps", pairDefinition.surveyId, areaId, fileName),
+    surveyAssetPath(projectId, pairDefinition.surveyId, areaId, fileName)
+  ]));
 }
 
 function renderVolumeReferenceGallery(cards, options = {}) {
@@ -5729,17 +5650,13 @@ function renderVolumeReferenceSelector(activeKey = "ab", availableKeys = []) {
   if (!els.volumeReferenceSelector) {
     return;
   }
-  const options = [
-    { key: "ab", label: "Survey 1 vs Survey 2" },
-    { key: "ac", label: "Survey 1 vs Survey 3" },
-    { key: "bc", label: "Survey 2 vs Survey 3" }
-  ];
+  const options = COMPARISON_PAIR_DEFS.filter((item) => availableKeys.includes(item.key) || item.key === activeKey);
   els.volumeReferenceSelector.innerHTML = options.map((item) => {
     const isActive = item.key === activeKey;
     const isAvailable = availableKeys.includes(item.key);
     return `
       <span class="volume-reference-pill ${isActive ? "active" : ""} ${isAvailable ? "" : "is-disabled"}">
-        <strong>${escapeHtml(item.label)}</strong>
+        <strong>${escapeHtml(comparisonPairLabel(item.fromRoundId, item.toRoundId))}</strong>
         <span>${escapeHtml(isAvailable ? (isActive ? "Reference maps shown below" : "Available") : "Coming soon")}</span>
       </span>
     `;
@@ -5747,36 +5664,133 @@ function renderVolumeReferenceSelector(activeKey = "ab", availableKeys = []) {
 }
 
 function comparisonReadinessCards(trendData, areaLabel, availableKeys = []) {
-  const pairSummaries = trendData ? trendPairSummaries(trendData.stats) : [];
-  const rollout = [
-    {
-      key: "ab",
-      label: "Survey 1 vs Survey 2",
-      status: availableKeys.includes("ab") ? "Live now" : "Waiting on files",
-      detail: availableKeys.includes("ab")
-        ? "The first comparison pair is now available with the wider trend story and flat reference maps."
-        : "This first comparison pair still needs its exported reference maps added before it can sit beside the trend panel cleanly.",
-      note: pairSummaries[0]?.supportingCopy || "Reference maps loaded."
-    },
-    {
-      key: "ac",
-      label: "Survey 1 vs Survey 3",
-      status: availableKeys.includes("ac") ? "Live now" : "Waiting on files",
-      detail: availableKeys.includes("ac")
-        ? `The longer-gap comparison is now live for ${areaLabel}, so people can jump from the trend summary into the full March-to-June reference view.`
-        : `The longer-gap comparison still needs its exported flat maps before the full March-to-June story is complete for ${areaLabel}.`,
-      note: pairSummaries[1]?.supportingCopy || "Reference maps loaded."
-    },
-    {
-      key: "bc",
-      label: "Survey 2 vs Survey 3",
-      status: availableKeys.includes("bc") ? "Live now" : "Waiting on files",
-      detail: availableKeys.includes("bc")
-        ? `The short late-season comparison is now live for ${areaLabel}, so the latest round-on-round change can be checked directly.`
-        : `The short late-season comparison is not wired in yet for ${areaLabel}, so the latest round-on-round flat maps are still missing.`,
-      note: pairSummaries[2]?.supportingCopy || "Reference maps loaded."
-    }
-  ];
+  const pairSummaries = new Map((trendData ? trendPairSummaries(trendData.stats) : []).map((item) => [item.key, item]));
+  const rollout = comparisonPairDefinitionsForSurvey(currentSurvey()?.id || "").map((item) => {
+    const label = comparisonPairLabel(item.fromRoundId, item.toRoundId);
+    const isAvailable = availableKeys.includes(item.key);
+    return {
+      key: item.key,
+      label,
+      status: isAvailable ? "Live now" : "Waiting on files",
+      detail: isAvailable
+        ? `${label} is now live for ${areaLabel}, so people can open this comparison directly alongside the main Area Change view.`
+        : `${label} still needs its exported flat maps before it can sit beside the main Area Change view cleanly for ${areaLabel}.`,
+      note: pairSummaries.get(item.key)?.supportingCopy || "Reference maps loaded."
+    };
+  });
+  return rollout.map((item) => `
+    <article class="card volume-breakdown-card">
+      <div class="volume-card__meta">
+        <div>
+          <p class="muted">${escapeHtml(areaLabel)}</p>
+          <h3>${escapeHtml(item.label)}</h3>
+        </div>
+      </div>
+      <p class="volume-rollout-status">${escapeHtml(item.status)}</p>
+      <p>${escapeHtml(item.detail)}</p>
+      <p class="muted">${escapeHtml(item.note)}</p>
+    </article>
+  `).join("");
+}
+
+function comparisonReferenceCaption(assetType, title) {
+  if (assetType === "classification") {
+    return `${title} class map. This is the simpler flat-view version for quick client-facing reading.`;
+  }
+  return `${title} height change map. Use this to see where the later survey sits higher or lower across the measured footprint.`;
+}
+
+function trendPairSummaries(stats) {
+  return trendComparisonEntries(stats).map((item) => {
+    const net = Number(item.volumeStats?.net_volume_m3 || 0);
+    const added = Number(item.volumeStats?.added_volume_m3 || 0);
+    const removed = Number(item.volumeStats?.removed_volume_m3 || 0);
+    const label = comparisonPairLabel(item.fromRoundId, item.toRoundId);
+    return {
+      key: item.key,
+      label,
+      added,
+      removed,
+      moved: totalMovementVolume(added, removed),
+      net,
+      readoutTitle: net >= 0 ? "Net build-up" : "Net lowering",
+      readoutCopy: net >= 0
+        ? `${label} ends with more material in the later survey overall.`
+        : `${label} ends with less material in the later survey overall.`,
+      supportingCopy: `${item.dateRange} | ${item.intervalDays} day gap | ${fixed(item.volumeStats?.matching_cells_percent || 0, 1)}% of cells matched cleanly.`
+    };
+  });
+}
+
+function legacyComparisonAssetCandidates(projectId, areaId, pairKey, assetType) {
+  const pairDefinition = COMPARISON_PAIR_DEFS.find((item) => item.key === pairKey);
+  if (!pairDefinition) {
+    return [];
+  }
+
+  const pairTag = `${pairDefinition.fromRoundId}_vs_${pairDefinition.toRoundId}`;
+  const legacyPairTag = `${pairDefinition.fromRoundId.toLowerCase()}${pairDefinition.toRoundId.toLowerCase()}`;
+  const pairAssets = assetType === "height"
+    ? [
+      `${areaId}_${pairTag}_height_change_analysis.png`,
+      `${areaId}_${pairTag}_height_change_analysis.jpg`,
+      `${areaId}_s${pairDefinition.fromRoundId.charCodeAt(0) - 64}_vs_s${pairDefinition.toRoundId.charCodeAt(0) - 64}_height_change_analysis.png`,
+      `${areaId}_${legacyPairTag}_height_change_analysis.png`,
+      ...(pairKey === "ab" ? [
+        `${areaId}_height_change_analysis.png`,
+        `${areaId}_height_change_analysis.jpg`
+      ] : [])
+    ]
+    : [
+      `${areaId}_${pairTag}_gain_loss_classification.png`,
+      `${areaId}_${pairTag}_gain_loss_classification.jpg`,
+      `${areaId}_s${pairDefinition.fromRoundId.charCodeAt(0) - 64}_vs_s${pairDefinition.toRoundId.charCodeAt(0) - 64}_gain_loss_classification.png`,
+      `${areaId}_${legacyPairTag}_gain_loss_classification.png`,
+      ...(pairKey === "ab" ? [
+        `${areaId}_gain_loss_classification.png`,
+        `${areaId}_gain_loss_classification.jpg`
+      ] : [])
+    ];
+
+  return pairAssets.flatMap((fileName) => ([
+    projectAssetPath(projectId, "stats", pairDefinition.surveyId, areaId, fileName),
+    projectAssetPath(projectId, "maps", pairDefinition.surveyId, areaId, fileName),
+    surveyAssetPath(projectId, pairDefinition.surveyId, areaId, fileName)
+  ]));
+}
+
+function legacyRenderVolumeReferenceSelector(activeKey = "ab", availableKeys = []) {
+  if (!els.volumeReferenceSelector) {
+    return;
+  }
+  const options = COMPARISON_PAIR_DEFS.filter((item) => availableKeys.includes(item.key) || item.key === activeKey);
+  els.volumeReferenceSelector.innerHTML = options.map((item) => {
+    const isActive = item.key === activeKey;
+    const isAvailable = availableKeys.includes(item.key);
+    return `
+      <span class="volume-reference-pill ${isActive ? "active" : ""} ${isAvailable ? "" : "is-disabled"}">
+        <strong>${escapeHtml(comparisonPairLabel(item.fromRoundId, item.toRoundId))}</strong>
+        <span>${escapeHtml(isAvailable ? (isActive ? "Reference maps shown below" : "Available") : "Coming soon")}</span>
+      </span>
+    `;
+  }).join("");
+}
+
+function legacyComparisonReadinessCards(trendData, areaLabel, availableKeys = []) {
+  const pairSummaries = new Map((trendData ? trendPairSummaries(trendData.stats) : []).map((item) => [item.key, item]));
+  const rollout = comparisonPairDefinitionsForSurvey(currentSurvey()?.id || "").map((item) => {
+    const label = comparisonPairLabel(item.fromRoundId, item.toRoundId);
+    const isAvailable = availableKeys.includes(item.key);
+    return {
+      key: item.key,
+      label,
+      status: isAvailable ? "Live now" : "Waiting on files",
+      detail: isAvailable
+        ? `${label} is now live for ${areaLabel}, so people can open this comparison directly alongside the main Area Change view.`
+        : `${label} still needs its exported flat maps before it can sit beside the main Area Change view cleanly for ${areaLabel}.`,
+      note: pairSummaries.get(item.key)?.supportingCopy || "Reference maps loaded."
+    };
+  });
   return rollout.map((item) => `
     <article class="card volume-breakdown-card">
       <div class="volume-card__meta">
@@ -5803,13 +5817,13 @@ function trendHeadline(topClass) {
     case "consistent_erosion":
       return "The main pattern here is steady lowering, so this part of the footprint has mostly kept losing material from one survey to the next.";
     case "accretion_then_erosion":
-      return "The main pattern here is build-up first, then lowering later. In plain English, material gathered earlier in the season, then some of that gain was lost again by June.";
+      return "The main pattern here is build-up first, then lowering later. In plain English, material gathered earlier in the survey sequence, then some of that gain was lost again later on.";
     case "erosion_then_accretion":
-      return "The main pattern here is lowering first, then recovery later. In plain English, this area dipped earlier on, then built back up by June.";
+      return "The main pattern here is lowering first, then recovery later. In plain English, this area dipped earlier on, then built back up in a later round.";
     case "stable":
-      return "A large part of this footprint stayed broadly similar across all three rounds, so it did not move enough to count as a meaningful rise or fall.";
+      return "A large part of this footprint stayed broadly similar across the loaded survey rounds, so it did not move enough to count as a meaningful rise or fall.";
     default:
-      return "This panel shows the longer-term story across all three survey rounds, not just one before-and-after pair.";
+      return "This panel shows the longer-term story across the loaded survey rounds, not just one before-and-after pair.";
   }
 }
 
@@ -5826,15 +5840,15 @@ function trendClassExplanation(key) {
     case "stable":
       return "This part stayed broadly the same across the survey set.";
     case "new_latest_accretion":
-      return "This part mainly changed in the latest round, ending up higher by June.";
+      return "This part mainly changed in the latest round, ending up higher in the newest comparison.";
     case "new_latest_erosion":
-      return "This part mainly changed in the latest round, ending up lower by June.";
+      return "This part mainly changed in the latest round, ending up lower in the newest comparison.";
     case "earlier_accretion_now_stable":
       return "This part built up earlier, then mostly held that newer shape.";
     case "earlier_erosion_now_stable":
       return "This part lowered earlier, then mostly settled into that newer level.";
     default:
-      return "This colour marks one of the repeated change patterns picked up across all three rounds.";
+      return "This colour marks one of the repeated change patterns picked up across the loaded survey rounds.";
   }
 }
 
@@ -5887,11 +5901,32 @@ function currentArea() {
 function surveyAssetPath(projectId, surveyId, areaId, fileName) {
   const survey = currentProject().surveys.find((item) => item.id === surveyId);
   const folder = survey?.dataFolder || surveyId;
-  return `./${assetSettings.surveyRoot}/${projectId}/${folder}/${areaId}/${fileName}`;
+  return `/${assetSettings.surveyRoot}/${projectId}/${folder}/${areaId}/${fileName}`;
 }
 
 function sharedAreaAssetPath(projectId, areaId, fileName) {
-  return `./${assetSettings.sharedRoot}/${projectId}/${areaId}/${fileName}`;
+  return `/${assetSettings.sharedRoot}/${projectId}/${areaId}/${fileName}`;
+}
+
+function projectAssetPath(projectId, ...parts) {
+  const encodedParts = parts.filter(Boolean).map((part) => encodeURIComponent(String(part)).replace(/%2F/g, "/"));
+  return `/public/projects/${encodeURIComponent(projectId)}/assets/${encodedParts.join("/")}`;
+}
+
+function projectSurveyAssetCandidates(projectId, surveyId, areaId, fileName) {
+  return assetFileNameVariants(areaId, fileName).flatMap((variant) => ([
+    projectAssetPath(projectId, "maps", surveyId, areaId, variant),
+    projectAssetPath(projectId, "reports", surveyId, areaId, variant),
+    projectAssetPath(projectId, "stats", surveyId, areaId, variant)
+  ]));
+}
+
+function projectSharedAssetCandidates(projectId, areaId, fileName) {
+  return assetFileNameVariants(areaId, fileName).flatMap((variant) => ([
+    projectAssetPath(projectId, "maps", areaId, variant),
+    projectAssetPath(projectId, "reports", areaId, variant),
+    projectAssetPath(projectId, "stats", areaId, variant)
+  ]));
 }
 
   function assetFileNameVariants(areaId, fileName) {
@@ -5906,11 +5941,17 @@ function sharedAreaAssetPath(projectId, areaId, fileName) {
   }
 
 function surveyAssetCandidates(projectId, surveyId, areaId, fileName) {
-  return assetFileNameVariants(areaId, fileName).map((variant) => surveyAssetPath(projectId, surveyId, areaId, variant));
+  return [
+    ...projectSurveyAssetCandidates(projectId, surveyId, areaId, fileName),
+    ...assetFileNameVariants(areaId, fileName).map((variant) => surveyAssetPath(projectId, surveyId, areaId, variant))
+  ];
 }
 
 function sharedAreaAssetCandidates(projectId, areaId, fileName) {
-  return assetFileNameVariants(areaId, fileName).map((variant) => sharedAreaAssetPath(projectId, areaId, variant));
+  return [
+    ...projectSharedAssetCandidates(projectId, areaId, fileName),
+    ...assetFileNameVariants(areaId, fileName).map((variant) => sharedAreaAssetPath(projectId, areaId, variant))
+  ];
 }
 
 async function resolveExistingAsset(candidates) {
@@ -6225,6 +6266,34 @@ function polygonLabelPoint(points) {
   async function loadSharedSectionGeometry(projectId, areaId) {
     const asset = await fetchJsonAsset(sharedAreaAssetCandidates(projectId, areaId, "line-length.geojson"));
     const features = asset?.json?.features || [];
+    const extent = geometryExtent(features);
+    if (extent) {
+      const geometryMap = new Map();
+      features.forEach((feature) => {
+        const coordinates = feature?.geometry?.coordinates;
+        if (!Array.isArray(coordinates) || coordinates.length < 2) {
+          return;
+        }
+        const points = coordinates.map((coordinate) => normaliseProjectedPoint(coordinate, extent));
+        const start = points[0];
+        const end = points[points.length - 1];
+        const sectionId = feature?.properties?.section_id || feature?.properties?.label;
+        if (!sectionId) {
+          return;
+        }
+        geometryMap.set(sectionId, {
+          hotspot: {
+            x: (start.x + end.x) / 2,
+            y: (start.y + end.y) / 2
+          },
+          track: { start, end, points }
+        });
+      });
+      if (geometryMap.size) {
+        return geometryMap;
+      }
+    }
+
     const explicitTracks = EXPLICIT_SECTION_IMAGE_TRACKS[areaId];
     if (explicitTracks?.length && features.length) {
       const sortedFeatures = [...features].sort((a, b) => {
@@ -6247,48 +6316,23 @@ function polygonLabelPoint(points) {
         ];
       }));
     }
+
     const overlayPath = await resolveExistingAsset(sharedAreaAssetCandidates(projectId, areaId, "section_lines.png"));
     const detectedTracks = overlayPath ? await detectSectionTracksFromImage(overlayPath, features.length) : [];
     if (detectedTracks.length === features.length && detectedTracks.length) {
-    const sortedFeatures = [...features].sort((a, b) => {
-      const aOrder = Number(a?.properties?.sort_order || 0);
-      const bOrder = Number(b?.properties?.sort_order || 0);
-      return aOrder - bOrder;
-    });
-    const sortedTracks = [...detectedTracks].sort((a, b) => a.hotspot.x - b.hotspot.x);
-    return new Map(sortedFeatures.map((feature, index) => ([
-      feature?.properties?.section_id || feature?.properties?.label,
-      sortedTracks[index]
-    ])));
-  }
-  const extent = geometryExtent(features);
-  if (!extent) {
+      const sortedFeatures = [...features].sort((a, b) => {
+        const aOrder = Number(a?.properties?.sort_order || 0);
+        const bOrder = Number(b?.properties?.sort_order || 0);
+        return aOrder - bOrder;
+      });
+      const sortedTracks = [...detectedTracks].sort((a, b) => a.hotspot.x - b.hotspot.x);
+      return new Map(sortedFeatures.map((feature, index) => ([
+        feature?.properties?.section_id || feature?.properties?.label,
+        sortedTracks[index]
+      ])));
+    }
+
     return null;
-  }
-
-  const geometryMap = new Map();
-  features.forEach((feature) => {
-    const coordinates = feature?.geometry?.coordinates;
-    if (!Array.isArray(coordinates) || coordinates.length < 2) {
-      return;
-    }
-    const points = coordinates.map((coordinate) => normaliseProjectedPoint(coordinate, extent));
-    const start = points[0];
-    const end = points[points.length - 1];
-    const sectionId = feature?.properties?.section_id || feature?.properties?.label;
-    if (!sectionId) {
-      return;
-    }
-    geometryMap.set(sectionId, {
-      hotspot: {
-        x: (start.x + end.x) / 2,
-        y: (start.y + end.y) / 2
-      },
-      track: { start, end, points }
-    });
-  });
-
-  return geometryMap;
 }
 
 async function detectSectionTracksFromImage(imagePath, expectedCount) {
@@ -6988,16 +7032,10 @@ async function assetExists(src) {
     return state.assetStatusCache.get(src);
   }
 
-  let result;
-  if (src.endsWith(".csv") || src.endsWith(".json")) {
-    result = await fetch(src).then((response) => response.ok).catch(() => false);
-  } else {
-    result = await new Promise((resolve) => {
-      const image = new Image();
-      image.onload = () => resolve(true);
-      image.onerror = () => resolve(false);
-      image.src = src;
-    });
+  const checkResponse = async (method) => fetch(src, { method }).then((response) => response.ok).catch(() => false);
+  let result = await checkResponse("HEAD");
+  if (!result) {
+    result = await checkResponse("GET");
   }
 
   state.assetStatusCache.set(src, result);
@@ -7260,9 +7298,11 @@ function renderCoverageCard(item) {
 }
 
 function activateTab(tabName) {
-  const safeTab = (!adminToolsEnabled() || !state.adminMode) && tabName === "admin"
-    ? "overview"
-    : tabName;
+  const allowedTabs = new Set(projectNavigationTabs());
+  const requestedTab = allowedTabs.has(tabName) ? tabName : (allowedTabs.has("overview") ? "overview" : firstAvailableProjectTab());
+  const safeTab = (!adminToolsEnabled() || !state.adminMode) && requestedTab === "admin"
+    ? (allowedTabs.has("overview") ? "overview" : firstAvailableProjectTab())
+    : requestedTab;
   if (safeTab !== "sections") {
     closeSectionInsightOverlay();
   }
@@ -7531,6 +7571,134 @@ function detail(title, copy) {
   return `<div class="detail-item"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(copy)}</p></div>`;
 }
 
+function starterLikeText(value) {
+  return /starter|placeholder|reference setup|tbd|example monitoring area/i.test(String(value || ""));
+}
+
+function customisedText(value) {
+  return typeof value === "string" && value.trim() && !starterLikeText(value);
+}
+
+function onboardingStepState({ complete, progress }) {
+  if (complete) {
+    return "complete";
+  }
+  if (progress) {
+    return "in-progress";
+  }
+  return "pending";
+}
+
+async function deriveProjectOnboarding(project, survey, existingCoverage = null) {
+  const areaList = project.projectAreaList || [];
+  const coverage = existingCoverage || await buildSurveyCoverage(project, survey);
+  const nonPlaceholderAreas = areaList.filter((area) => !starterLikeText(area.title) && !starterLikeText(area.purpose)).length;
+  const overrideCount = areaList.filter((area) => Object.keys(areaOverride(project, survey.id, area.id) || {}).length).length;
+  const identitySignals = [
+    customisedText(project.status),
+    customisedText(project.selectorSummary),
+    customisedText(project.site?.county)
+  ].filter(Boolean).length;
+
+  const steps = [
+    {
+      title: "Project identity customised",
+      status: onboardingStepState({
+        complete: identitySignals >= 3,
+        progress: identitySignals > 0
+      }),
+      value: identitySignals >= 3 ? "Ready for live use" : identitySignals > 0 ? `${identitySignals}/3 starter fields replaced` : "Still using scaffold defaults",
+      copy: identitySignals >= 3
+        ? "Project name, summary, and site metadata have moved beyond the generic starter state."
+        : "Replace the remaining starter metadata in project.json so the report reads like a real client project.",
+      nextAction: "Update project status, selector summary, and site location fields in project.json."
+    },
+    {
+      title: "Area catalogue defined",
+      status: onboardingStepState({
+        complete: areaList.length > 1 && nonPlaceholderAreas === areaList.length,
+        progress: nonPlaceholderAreas > 0
+      }),
+      value: nonPlaceholderAreas ? `${nonPlaceholderAreas}/${areaList.length} area definitions customised` : "Starter area only",
+      copy: areaList.length > 1 && nonPlaceholderAreas === areaList.length
+        ? "The project has a meaningful set of monitoring areas instead of the single placeholder area."
+        : "Add the real monitoring reaches and replace any remaining example labels or purposes in areas.json.",
+      nextAction: "Expand areas.json with the real estuary reaches and area-specific summaries."
+    },
+    {
+      title: "Repeat survey history ready",
+      status: onboardingStepState({
+        complete: (project.surveys || []).length >= 2,
+        progress: (project.surveys || []).length === 1
+      }),
+      value: `${(project.surveys || []).length} survey round${(project.surveys || []).length === 1 ? "" : "s"} configured`,
+      copy: (project.surveys || []).length >= 2
+        ? "The project now has at least one comparable repeat round, so change monitoring can operate normally."
+        : project.singleScanMessage,
+      nextAction: "Create the second comparable survey round once the next field campaign is ready."
+    },
+    {
+      title: "Survey-specific area notes captured",
+      status: onboardingStepState({
+        complete: areaList.length > 0 && overrideCount === areaList.length,
+        progress: overrideCount > 0
+      }),
+      value: `${overrideCount}/${areaList.length || 0} areas with survey-specific notes`,
+      copy: overrideCount
+        ? "Some selected-area context is already tailored to this survey round instead of relying on shared baseline notes."
+        : "The selected survey is still using baseline area notes everywhere.",
+      nextAction: "Use the admin context editor to save timing, tide, weather, and interpretation notes for each area."
+    },
+    {
+      title: "Survey assets uploaded",
+      status: onboardingStepState({
+        complete: coverage.totalFiles > 0 && coverage.presentFiles === coverage.totalFiles,
+        progress: coverage.presentFiles > 0
+      }),
+      value: `${coverage.presentFiles}/${coverage.totalFiles} expected files present`,
+      copy: coverage.presentFiles === coverage.totalFiles && coverage.totalFiles > 0
+        ? "All expected survey imagery files are present for the selected round."
+        : "Upload coverage is incomplete for the selected survey, so some compare views will still be missing.",
+      nextAction: "Upload the expected ortho, DSM, contour, section-line, and CSV outputs for each area."
+    }
+  ];
+
+  return {
+    completeCount: steps.filter((step) => step.status === "complete").length,
+    inProgressCount: steps.filter((step) => step.status === "in-progress").length,
+    pendingCount: steps.filter((step) => step.status === "pending").length,
+    nextPriority: steps.find((step) => step.status !== "complete") || null,
+    steps
+  };
+}
+
+function renderOnboardingChecklist(summaryEl, detailsEl, onboarding) {
+  if (!summaryEl || !detailsEl || !onboarding) {
+    return;
+  }
+
+  summaryEl.innerHTML = [
+    metric("Setup steps complete", String(onboarding.completeCount), "Checklist items fully in place"),
+    metric("Setup in progress", String(onboarding.inProgressCount), "Started but not fully complete"),
+    metric("Still to do", String(onboarding.pendingCount), "Still using starter or missing data"),
+    metric("Next priority", onboarding.nextPriority?.title || "All set", onboarding.nextPriority?.nextAction || "The current project onboarding checklist is complete.")
+  ].join("");
+
+  detailsEl.innerHTML = onboarding.steps.map((step) => `
+    <article class="card onboarding-card">
+      <div class="onboarding-card__meta">
+        <h3>${escapeHtml(step.title)}</h3>
+        <span class="onboarding-card__status" data-status="${escapeAttr(step.status)}">${escapeHtml(step.status.replace("-", " "))}</span>
+      </div>
+      <p><strong>${escapeHtml(step.value)}</strong></p>
+      <p>${escapeHtml(step.copy)}</p>
+      <div class="detail-list">
+        ${detail("Next action", step.nextAction)}
+      </div>
+    </article>
+  `).join("");
+}
+
 function assetCard(title, copy) {
   return `<article class="card"><h3>${escapeHtml(title)}</h3><p>${escapeHtml(copy)}</p></article>`;
 }
@@ -7703,3 +7871,4 @@ function escapeHtml(value) {
 function escapeAttr(value) {
   return escapeHtml(value);
 }
+
