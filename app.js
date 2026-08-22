@@ -3053,8 +3053,9 @@ async function renderVolumeLegacy() {
     acc.gain += Number(item.gainM3 || 0);
     acc.loss += Number(item.lossM3 || 0);
     acc.net += Number(item.netM3 || 0);
+    acc.moved += totalMovementVolume(item.gainM3, item.lossM3);
     return acc;
-  }, { gain: 0, loss: 0, net: 0 });
+  }, { gain: 0, loss: 0, net: 0, moved: 0 });
 
   const volumeLegendMarkup = `
     <div class="detail-item">
@@ -3137,6 +3138,7 @@ async function renderVolumeLegacy() {
     metric("Monitored sandbars", String(polygons.length), area.overviewCode),
     metric("Total gain", formatVolume(totals.gain), "Deposited sediment"),
     metric("Total loss", formatVolume(totals.loss), "Eroded sediment"),
+    metric("Total moved", formatVolume(totals.moved), "Sediment redistributed in either direction"),
     metric("Net change", formatVolume(totals.net), totals.net >= 0 ? "Overall build-up" : "Overall erosion")
   ].join("");
 
@@ -3178,6 +3180,10 @@ async function renderVolumeLegacy() {
           <div class="volume-mini volume-mini--loss">
             <span class="muted">Loss</span>
             <strong>${escapeHtml(formatVolume(item.lossM3))}</strong>
+          </div>
+          <div class="volume-mini">
+            <span class="muted">Total moved</span>
+            <strong>${escapeHtml(formatVolume(totalMovementVolume(item.gainM3, item.lossM3)))}</strong>
           </div>
           <div class="volume-mini volume-mini--net">
             <span class="muted">Net</span>
@@ -3221,8 +3227,9 @@ async function renderVolumePrevious() {
     acc.gain += Number(item.gainM3 || 0);
     acc.loss += Number(item.lossM3 || 0);
     acc.net += Number(item.netM3 || 0);
+    acc.moved += totalMovementVolume(item.gainM3, item.lossM3);
     return acc;
-  }, { gain: 0, loss: 0, net: 0 });
+  }, { gain: 0, loss: 0, net: 0, moved: 0 });
 
   if (!baselineSurvey && !volumeDataset) {
     els.volumeSummary.textContent = `${survey.label} is the baseline round, so volume change is not yet available. Switch to a later survey round once a comparison has been calculated.`;
@@ -3301,6 +3308,7 @@ async function renderVolumePrevious() {
       metric("Monitored sandbars", String(polygons.length), area.overviewCode),
       metric("Total gain", formatVolume(totals.gain), "Deposited sediment"),
       metric("Total loss", formatVolume(totals.loss), "Eroded sediment"),
+      metric("Total moved", formatVolume(totals.moved), "Sediment redistributed in either direction"),
       metric("Net change", formatVolume(totals.net), totals.net >= 0 ? "Overall build-up" : "Overall erosion")
     ].join("")
     : [
@@ -3352,6 +3360,10 @@ async function renderVolumePrevious() {
           <div class="volume-mini volume-mini--loss">
             <span class="muted">Loss</span>
             <strong>${escapeHtml(formatVolume(item.lossM3))}</strong>
+          </div>
+          <div class="volume-mini">
+            <span class="muted">Total moved</span>
+            <strong>${escapeHtml(formatVolume(totalMovementVolume(item.gainM3, item.lossM3)))}</strong>
           </div>
           <div class="volume-mini volume-mini--net">
             <span class="muted">Net</span>
@@ -3584,8 +3596,9 @@ async function renderVolume() {
     acc.gain += Number(item.gainM3 || 0);
     acc.loss += Number(item.lossM3 || 0);
     acc.net += Number(item.netM3 || 0);
+    acc.moved += totalMovementVolume(item.gainM3, item.lossM3);
     return acc;
-  }, { gain: 0, loss: 0, net: 0 });
+  }, { gain: 0, loss: 0, net: 0, moved: 0 });
 
   const setViewerState = (enabled) => {
     els.volumeViewerPanel.classList.toggle("is-hidden", !enabled);
@@ -3677,6 +3690,10 @@ async function renderVolume() {
                 <div class="volume-mini volume-mini--loss">
                   <span class="muted">Material removed</span>
                   <strong>${escapeHtml(formatVolume(item.removed))}</strong>
+                </div>
+                <div class="volume-mini">
+                  <span class="muted">Total moved</span>
+                  <strong>${escapeHtml(formatVolume(item.moved))}</strong>
                 </div>
                 <div class="volume-mini volume-mini--net">
                   <span class="muted">Overall balance</span>
@@ -3884,6 +3901,7 @@ async function renderVolume() {
       metric("Measured sandbar zones", String(polygons.length), area.overviewCode),
       metric("Material added", formatVolume(totals.gain), "More material appears in the later survey"),
       metric("Material removed", formatVolume(totals.loss), "Less material appears in the later survey"),
+      metric("Total moved", formatVolume(totals.moved), "Total sediment redistributed across the measured zones"),
       metric("Overall balance", formatVolume(totals.net), totals.net >= 0 ? "More material overall in the later survey" : "Less material overall in the later survey")
     ].join("")
     : [
@@ -5404,6 +5422,10 @@ function currentAreaVolumeDataset() {
   return currentVolumeDataset()?.areas?.[currentArea().id] || null;
 }
 
+function totalMovementVolume(added, removed) {
+  return Number(added || 0) + Math.abs(Number(removed || 0));
+}
+
 function formatVolume(value) {
   const number = Number(value || 0);
   const rounded = Math.abs(number) >= 100 ? number.toFixed(0) : number.toFixed(1);
@@ -5497,10 +5519,13 @@ function trendPairSummaries(stats) {
     pairBC ? { label: "Survey 2 vs Survey 3", dateRange: pairBC.date_range, intervalDays: pairBC.interval_days, ...pairBC.volume_stats } : null
   ].filter(Boolean).map((item) => {
     const net = Number(item.net_volume_m3 || 0);
+    const added = Number(item.added_volume_m3 || 0);
+    const removed = Number(item.removed_volume_m3 || 0);
     return {
       label: item.label,
-      added: Number(item.added_volume_m3 || 0),
-      removed: Number(item.removed_volume_m3 || 0),
+      added,
+      removed,
+      moved: totalMovementVolume(added, removed),
       net,
       readoutTitle: net >= 0 ? "Net build-up" : "Net lowering",
       readoutCopy: net >= 0
