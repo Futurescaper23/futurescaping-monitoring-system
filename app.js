@@ -5352,6 +5352,13 @@ function liveVolumeAreaIds(project = currentProject()) {
       liveAreaIds.add(areaId);
     });
   });
+  if (project?.id === "padstow-estuary") {
+    ["area1", "area2", "area3", "area4"].forEach((areaId) => {
+      if (areaById(areaId)) {
+        liveAreaIds.add(areaId);
+      }
+    });
+  }
   return [...liveAreaIds].sort((left, right) => left.localeCompare(right));
 }
 
