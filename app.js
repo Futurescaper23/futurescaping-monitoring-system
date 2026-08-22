@@ -3809,6 +3809,14 @@ async function renderVolume() {
   const baselineLabel = volumeDataset?.baselineSurveyId
     ? (project.surveys.find((item) => item.id === volumeDataset.baselineSurveyId)?.label || baselineSurvey?.label || "baseline survey")
     : (baselineSurvey?.label || "baseline survey");
+  const hasCompleteLivePackage = Boolean(
+    viewerEmbedUrl
+    || trendData
+    || allReferenceMaps.length
+    || useSinglePreview
+    || usePairedPreview
+    || hasConfiguredRows
+  );
 
   if (!hasConfiguredRows && !useSinglePreview && !usePairedPreview && !allReferenceMaps.length && !trendData) {
     const previewFallbackCards = [];
@@ -3920,43 +3928,77 @@ async function renderVolume() {
       metric("Next step", "Add m3 values", "Enter added, removed, and overall balance per sandbar in admin")
     ].join("");
 
-  els.volumeMethod.innerHTML = `
-    <div class="volume-explainer">
-      <div class="volume-explainer__block">
-        <strong>What this page is doing now</strong>
-        <p>This page now combines three layers of evidence for ${escapeHtml(area.label)}: the interactive 3D comparison viewer, the longer-term trend map across all three survey rounds, and the flat reference maps underneath.</p>
+  els.volumeMethod.innerHTML = hasCompleteLivePackage
+    ? `
+      <div class="volume-explainer">
+        <div class="volume-explainer__block">
+          <strong>What this page is doing now</strong>
+          <p>This page now combines three layers of evidence for ${escapeHtml(area.label)}: the interactive 3D comparison viewer, the longer-term trend map across all three survey rounds, and the flat reference maps underneath.</p>
+        </div>
+        <div class="volume-explainer__block">
+          <strong>How to read it in order</strong>
+          <p>Start with the 3D viewer for detailed shape change, use the trend panel to see whether movement is repeating or reversing across the full survey set, then use the six reference maps for a simpler side-by-side plan-view check.</p>
+        </div>
+        <div class="volume-explainer__block">
+          <strong>How the trend layer is built</strong>
+          <p>The trend panel is not just one before-and-after comparison. It looks across Survey 1, Survey 2, and Survey 3 together so we can separate steady build-up, steady lowering, and areas that changed direction over time.</p>
+        </div>
+        <div class="volume-explainer__block">
+          <strong>Current area note</strong>
+          <p>${escapeHtml(areaDataset?.notes || "Add a short plain-English note here to explain what changed in this part of the estuary.")}</p>
+        </div>
       </div>
-      <div class="volume-explainer__block">
-        <strong>How to read it in order</strong>
-        <p>Start with the 3D viewer for detailed shape change, use the trend panel to see whether movement is repeating or reversing across the full survey set, then use the six reference maps for a simpler side-by-side plan-view check.</p>
+    `
+    : `
+      <div class="volume-explainer">
+        <div class="volume-explainer__block">
+          <strong>What this page is doing now</strong>
+          <p>${escapeHtml(area.label)} is back in the live change-analysis shortcut row, but this area is still waiting for its finished change package. Right now the page uses the available survey imagery as a holding view.</p>
+        </div>
+        <div class="volume-explainer__block">
+          <strong>What is missing</strong>
+          <p>The dedicated 3D viewer, flat comparison exports, trend package, and measured sandbar figures have not been added for this area yet.</p>
+        </div>
+        <div class="volume-explainer__block">
+          <strong>Current area note</strong>
+          <p>${escapeHtml(areaDataset?.notes || "Area-level change-analysis notes have not been added here yet.")}</p>
+        </div>
       </div>
-      <div class="volume-explainer__block">
-        <strong>How the trend layer is built</strong>
-        <p>The trend panel is not just one before-and-after comparison. It looks across Survey 1, Survey 2, and Survey 3 together so we can separate steady build-up, steady lowering, and areas that changed direction over time.</p>
-      </div>
-      <div class="volume-explainer__block">
-        <strong>Current area note</strong>
-        <p>${escapeHtml(areaDataset?.notes || "Add a short plain-English note here to explain what changed in this part of the estuary.")}</p>
-      </div>
-    </div>
-  `;
+    `;
 
-  els.volumeNarrative.innerHTML = `
-    <div class="volume-explainer">
-      <div class="volume-explainer__block">
-        <strong>What is live right now</strong>
-        <p>${escapeHtml(area.label)} is using the current live change-analysis layout. Where the trend package is present, the page can now bring the three-round story, the change viewer, and the exported flat maps together in one place.</p>
+  els.volumeNarrative.innerHTML = hasCompleteLivePackage
+    ? `
+      <div class="volume-explainer">
+        <div class="volume-explainer__block">
+          <strong>What is live right now</strong>
+          <p>${escapeHtml(area.label)} is using the current live change-analysis layout. Where the trend package is present, the page can now bring the three-round story, the change viewer, and the exported flat maps together in one place.</p>
+        </div>
+        <div class="volume-explainer__block">
+          <strong>What the client should take from it</strong>
+          <p>The top half of the page explains where the estuary appears to be repeatedly building up, repeatedly lowering, or changing direction between rounds. The lower reference maps then let people compare whichever survey pairs are ready for this area without leaving the page.</p>
+        </div>
+        <div class="volume-explainer__block">
+          <strong>What comes next</strong>
+          <p>Any future areas can now use this same structure: 3D viewer at the top, trend summary in the middle, and a six-image comparison strip underneath with click-to-expand detail when needed.</p>
+        </div>
       </div>
-      <div class="volume-explainer__block">
-        <strong>What the client should take from it</strong>
-        <p>The top half of the page explains where the estuary appears to be repeatedly building up, repeatedly lowering, or changing direction between rounds. The lower reference maps then let people compare whichever survey pairs are ready for this area without leaving the page.</p>
+    `
+    : `
+      <div class="volume-explainer">
+        <div class="volume-explainer__block">
+          <strong>What is live right now</strong>
+          <p>The survey imagery is available and the area can be selected again, so people can at least keep their place in the monitoring workflow while the fuller outputs are prepared.</p>
+        </div>
+        <div class="volume-explainer__block">
+          <strong>What the client should take from it</strong>
+          <p>This should currently be read as visual context only, not as a finished change-analysis result. The proper build-up, lowering, and balance story will come in once the measured exports are added.</p>
+        </div>
+        <div class="volume-explainer__block">
+          <strong>What comes next</strong>
+          <p>The next step for ${escapeHtml(area.label)} is to add its comparison imagery, measured figures, and any viewer or trend outputs so it matches the more complete live areas.</p>
+        </div>
       </div>
-      <div class="volume-explainer__block">
-        <strong>What comes next</strong>
-        <p>Any future areas can now use this same structure: 3D viewer at the top, trend summary in the middle, and a six-image comparison strip underneath with click-to-expand detail when needed.</p>
-      </div>
-    </div>
-  `;
+    `;
 
   els.volumeAreaGrid.innerHTML = comparisonReadinessCards(trendData, area.label, availableComparisonKeys);
 }
